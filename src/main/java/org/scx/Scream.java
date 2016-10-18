@@ -2,11 +2,13 @@ package org.scx;
 
 import static java.lang.String.format;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
 import org.scx.data.Data;
 import org.scx.data.RandomScenario;
+import org.scx.data.RandomScenarioGenerator;
 import org.scx.model.MulticutLShaped;
 import org.scx.model.SampledAverageApproximation;
 import org.scx.model.SingleModel;
@@ -19,10 +21,29 @@ import ilog.concert.IloException;
  */
 public class Scream {
 
+    private enum Model {
+        deterministic, discrete, full;
+    }
+
     public static void main(String[] args) {
-        // Build and solve full stochastic bender decomposed model
+        Model model = args != null ? Model.valueOf(args[0]) : Model.full;
+
         Random random = new Random(0);
-        solveFullStochastic(random);
+        switch (model) {
+            case deterministic:
+                RandomScenario scenario = RandomScenarioGenerator.generateSingle();
+                solveUnified(scenario);
+                break;
+            case discrete:
+                List<RandomScenario> scenarios = RandomScenarioGenerator.generate(random, 10, 10);
+                solveDiscretizedScenarios(scenarios);
+                break;
+            case full:
+                solveFullStochastic(random);
+                break;
+            default:
+                throw new IllegalStateException("Incorrect model name : " + Arrays.toString(Model.values()));
+        }
     }
 
     /**
@@ -45,7 +66,7 @@ public class Scream {
     /**
      * Solves the full stochastic model
      */
-    protected static void solveDiscretizedScenarios(List<RandomScenario> scenarios) {
+    private static void solveDiscretizedScenarios(List<RandomScenario> scenarios) {
         try {
             long start = System.currentTimeMillis();
             MulticutLShaped model = new MulticutLShaped(scenarios);
@@ -65,7 +86,7 @@ public class Scream {
      * 
      * @param scenario
      */
-    protected static void solveUnified(RandomScenario scenario) {
+    private static void solveUnified(RandomScenario scenario) {
         try {
             long start = System.currentTimeMillis();
             SingleModel model = new SingleModel(scenario);
