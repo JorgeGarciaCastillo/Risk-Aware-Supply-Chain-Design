@@ -5,7 +5,7 @@
 The code here provides a solution method to handle the SCREAM game as a stochastic program in a global way.
 
 The code here implements the algorithm Sampled Average Approximation solved by MulticutLShaped method using Java API to CPLEX. The model is a robust prduction planning problem.
-It assumes that demand is independent for disruptions and disruptions start is uniformly distributed for the weeks of the year.
+It assumes that demand is independent from disruptions and disruptions start is uniformly distributed for the weeks of the year.
 
 The code actually contains different approaches:
 
