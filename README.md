@@ -19,11 +19,11 @@ To run each option you need to change the following field in the pom.xml file:
   <argument>discrete</argument>
 </arguments>
 ```
-The different values are listed the in Scream.java class.
+The different values are listed in the Scream.java class.
 
 ### CPLEX ###
 The current version works with CPLEX 12.6 and *should* work with earlier versions. 
-There is a reference to a cplex.jar and cplex.dll in the pom.xml but due to licesing constraints I am unable to distribute it.
+There is a reference to cplex.jar and cplex.dll in the pom.xml but due to licesing constraints I am unable to distribute it.
 
 ### Setup ###
 
