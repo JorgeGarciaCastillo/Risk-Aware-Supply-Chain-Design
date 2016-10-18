@@ -1,0 +1,53 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>org.scx</groupId>
+  <artifactId>scream</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <name>Robust Production Planning</name>
+  <url>http://maven.apache.org</url>
+
+  <properties>
+    <java.version>1.8</java.version>
+    <cplex.version>12.6.1</cplex.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+  
+  <prerequisites>
+     <maven>3.1.0</maven>
+  </prerequisites>
+  
+  <dependencies>
+        <dependency>
+            <groupId>com.ibm.ilog</groupId>
+            <artifactId>cplex</artifactId>
+            <version>${cplex.version}</version>
+            <classifier>win64</classifier>
+        </dependency>
+
+        <dependency>
+            <groupId>com.ibm.ilog</groupId>
+            <artifactId>cplex-runtime</artifactId>
+            <version>${cplex.version}</version>
+            <classifier>win64</classifier>
+            <type>dll</type>
+        </dependency>
+  </dependencies>
+  
+  <build>
+    <plugins>
+	    <plugin>
+		  <groupId>org.apache.maven.plugins</groupId>
+		  <artifactId>maven-compiler-plugin</artifactId>
+		  <version>3.1</version>
+		  <configuration>
+		    <source>${java.version}</source>
+		    <target>${java.version}</target>
+		  </configuration>
+		</plugin>
+    </plugins>
+  </build>
+</project>

@@ -1,0 +1,21 @@
+/target/
+
+# IDE settings #
+/.settings/
+.classpath
+.project
+
+*.class
+
+# Package Files #
+*.jar
+
+# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*
+
+# CPLEX related files #
+*.lp
+*.sav
+*.prm
+*.sol
+*.log
