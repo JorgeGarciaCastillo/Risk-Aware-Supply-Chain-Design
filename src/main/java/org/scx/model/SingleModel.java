@@ -1,19 +1,19 @@
 package org.scx.model;
 
-import static org.scx.data.Data.FG_COST;
-import static org.scx.data.Data.FG_PRICE;
-import static org.scx.data.Data.IRR;
-import static org.scx.data.Data.MEAN_DEMAND;
-import static org.scx.data.Data.NUM_BACKUP_POLICIES;
-import static org.scx.data.Data.PLANT_CAPACITY;
-import static org.scx.data.Data.SUPPLIER_CAPACITY;
-import static org.scx.data.Data.WEEKS_PER_YEAR;
-import static org.scx.data.Data.WIP_COST;
+import static org.scx.Data.FG_COST;
+import static org.scx.Data.FG_PRICE;
+import static org.scx.Data.IRR;
+import static org.scx.Data.MEAN_DEMAND;
+import static org.scx.Data.NUM_BACKUP_POLICIES;
+import static org.scx.Data.PLANT_CAPACITY;
+import static org.scx.Data.SUPPLIER_CAPACITY;
+import static org.scx.Data.WEEKS_PER_YEAR;
+import static org.scx.Data.WIP_COST;
 
-import org.scx.data.Data;
-import org.scx.data.Data.BackupOption;
-import org.scx.data.RandomScenario;
+import org.scx.Data;
+import org.scx.Data.BackupOption;
 import org.scx.model.Solution.BackupPolicy;
+import org.scx.sample.RandomScenario;
 
 import ilog.concert.IloException;
 import ilog.concert.IloLinearNumExpr;

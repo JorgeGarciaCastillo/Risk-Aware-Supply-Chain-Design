@@ -6,13 +6,14 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
-import org.scx.data.Data;
-import org.scx.data.RandomScenario;
-import org.scx.data.RandomScenarioGenerator;
 import org.scx.model.MulticutLShaped;
 import org.scx.model.SampledAverageApproximation;
 import org.scx.model.SingleModel;
 import org.scx.model.Solution;
+import org.scx.sample.LatinHypercubeSampler;
+import org.scx.sample.MonteCarloSampler;
+import org.scx.sample.RandomScenario;
+import org.scx.sample.SingleScenarioSampler;
 
 import ilog.concert.IloException;
 
@@ -26,16 +27,15 @@ public class Scream {
     }
 
     public static void main(String[] args) {
-        Model model = args != null ? Model.valueOf(args[0]) : Model.full;
-
+        Model model = args != null && args.length > 0 ? Model.valueOf(args[0]) : Model.full;
         Random random = new Random(0);
         switch (model) {
             case deterministic:
-                RandomScenario scenario = RandomScenarioGenerator.generateSingle();
+                RandomScenario scenario = new SingleScenarioSampler().generate(1, 1).get(0);
                 solveUnified(scenario);
                 break;
             case discrete:
-                List<RandomScenario> scenarios = RandomScenarioGenerator.generate(random, 10, 10);
+                List<RandomScenario> scenarios = new MonteCarloSampler(random).generate(10, 10);
                 solveDiscretizedScenarios(scenarios);
                 break;
             case full:
@@ -52,7 +52,7 @@ public class Scream {
     private static void solveFullStochastic(Random random) {
         try {
             long start = System.currentTimeMillis();
-            SampledAverageApproximation saa = new SampledAverageApproximation(random);
+            SampledAverageApproximation saa = new SampledAverageApproximation(0.95, new LatinHypercubeSampler(random));
             saa.approximateSolution(10, 50, 500);
             Solution s = saa.getSolution();
             long end = System.currentTimeMillis();
@@ -74,6 +74,7 @@ public class Scream {
             Solution s = model.getSolution();
             long end = System.currentTimeMillis();
             display(s);
+            model.end();
             System.out.println("*** Elapsed time = " + (end - start) + " ms. ***");
         } catch (IloException ex) {
             System.err.println("\n!!!Unable to solve the Benders model:\n" + ex.getMessage() + "!!!");

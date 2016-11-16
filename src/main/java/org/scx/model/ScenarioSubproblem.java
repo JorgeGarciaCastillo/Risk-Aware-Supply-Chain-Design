@@ -1,14 +1,14 @@
 package org.scx.model;
 
-import static org.scx.data.Data.BASE_DC_STOCK_LEVEL;
-import static org.scx.data.Data.FG_COST;
-import static org.scx.data.Data.FG_PRICE;
-import static org.scx.data.Data.IRR;
-import static org.scx.data.Data.MAX_DELAY;
-import static org.scx.data.Data.PLANT_CAPACITY;
-import static org.scx.data.Data.SUPPLIER_CAPACITY;
-import static org.scx.data.Data.WEEKS_PER_YEAR;
-import static org.scx.data.Data.WIP_COST;
+import static org.scx.Data.BASE_DC_STOCK_LEVEL;
+import static org.scx.Data.FG_COST;
+import static org.scx.Data.FG_PRICE;
+import static org.scx.Data.IRR;
+import static org.scx.Data.MAX_DELAY;
+import static org.scx.Data.PLANT_CAPACITY;
+import static org.scx.Data.SUPPLIER_CAPACITY;
+import static org.scx.Data.WEEKS_PER_YEAR;
+import static org.scx.Data.WIP_COST;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -16,8 +16,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
 
-import org.scx.data.Data;
-import org.scx.data.RandomScenario;
+import org.scx.Data;
+import org.scx.sample.RandomScenario;
 
 import ilog.concert.IloConstraint;
 import ilog.concert.IloException;
@@ -124,6 +124,7 @@ public class ScenarioSubproblem implements Callable<IloCplex.Status> {
 
     // Maps each constraint to its right-hand side
     private Map<IloRange, IloNumExpr> rangeToRHS;
+    private boolean modelBuilt;
 
 
     /**
@@ -134,43 +135,44 @@ public class ScenarioSubproblem implements Callable<IloCplex.Status> {
      * @param s
      * @throws IloException
      */
-    public ScenarioSubproblem(MulticutLShaped masterProblem, RandomScenario s) throws IloException {
-        sub = new IloCplex();
-        master = masterProblem.master;
-        rangeToRHS = new LinkedHashMap<>();
+    public ScenarioSubproblem(MulticutLShaped masterProblem, RandomScenario s) {
+        try {
+            sub = new IloCplex();
+            master = masterProblem.master;
+            rangeToRHS = new LinkedHashMap<>();
 
-        scenario = s;
-        backupFGPolicy = masterProblem.backupFGPolicy;
-        backupWIPPolicy = masterProblem.backupWIPPolicy;
-        backupSupplierCapacity = masterProblem.backupSupplierCapacity;
-        backupPlantCapacity = masterProblem.backupPlantCapacity;
-        backupDCCapacity = masterProblem.backupDCCapacity;
+            scenario = s;
+            backupFGPolicy = masterProblem.backupFGPolicy;
+            backupWIPPolicy = masterProblem.backupWIPPolicy;
+            backupSupplierCapacity = masterProblem.backupSupplierCapacity;
+            backupPlantCapacity = masterProblem.backupPlantCapacity;
+            backupDCCapacity = masterProblem.backupDCCapacity;
 
-        backupSupplierDelayedCapacity = masterProblem.backupSupplierDelayedCapacity;
-        backupPlantDelayedCapacity = masterProblem.backupPlantDelayedCapacity;
-        backupDCDelayedCapacity = masterProblem.backupDCDelayedCapacity;
+            backupSupplierDelayedCapacity = masterProblem.backupSupplierDelayedCapacity;
+            backupPlantDelayedCapacity = masterProblem.backupPlantDelayedCapacity;
+            backupDCDelayedCapacity = masterProblem.backupDCDelayedCapacity;
 
-        randomDemand = new IloNumExpr[s.getRandomDemand().length];
-        for (int i = 0; i < randomDemand.length; i++) {
-            randomDemand[i] = masterProblem.master.linearIntExpr(s.getRandomDemand()[i]);
+            buildSubProblem();
+        } catch (IloException e) {
+            throw new IllegalStateException("Error building subproblem " + s + " :\n" + e);
         }
-
-        buildSubProblem();
-        configureSubproblemSolver();
-    }
-
-
-    private void configureSubproblemSolver() {
-        // We suppress subproblems solver log to avoid confussion
-        sub.setOut(null);
     }
 
 
     /**
      * Builds the subproblem for a scenario and a given backup policy
      */
-    private final void buildSubProblem() throws IloException {
+    public void buildSubProblem() throws IloException {
+        if (!modelBuilt) {
+            buildVariablesAndConstraints();
+            modelBuilt = true;
+        }
+        configureSolver();
+    }
 
+
+    private void buildVariablesAndConstraints() throws IloException {
+        buildRandomDemandRHS();
         buildSubproblemVariables();
         buildSubproblemObjective();
         buildSupplyStatus();
@@ -179,10 +181,23 @@ public class ScenarioSubproblem implements Callable<IloCplex.Status> {
         buildStockBalance();
         buildNoTransferIfNoDisruption();
         buildDesiredItemFillRatio();
+    }
 
+
+    private void configureSolver() throws IloException {
         // disable presolving of the subproblem (if the presolver realizes the
         // subproblem is infeasible, we do not get a dual ray)
         sub.setParam(IloCplex.BooleanParam.PreInd, false);
+        // We suppress subproblems solver log to avoid confussion
+        sub.setOut(null);
+    }
+
+
+    private void buildRandomDemandRHS() throws IloException {
+        randomDemand = new IloNumExpr[scenario.getRandomDemand().length];
+        for (int i = 0; i < randomDemand.length; i++) {
+            randomDemand[i] = master.linearIntExpr(scenario.getRandomDemand()[i]);
+        }
     }
 
     private void buildSubproblemVariables() throws IloException {
@@ -435,8 +450,9 @@ public class ScenarioSubproblem implements Callable<IloCplex.Status> {
 
     public IloCplex.Status solve() throws IloException {
         sub.solve();
-        sub.exportModel("Subproblem.sav");
-        sub.exportModel("Subproblem.lp");
+
+        //        sub.exportModel("Subproblem.sav");
+        //        sub.exportModel("Subproblem.lp");
         return sub.getStatus();
     }
 
@@ -509,6 +525,7 @@ public class ScenarioSubproblem implements Callable<IloCplex.Status> {
 
     @Override
     public Status call() throws Exception {
+        buildSubProblem();
         return solve();
     }
 

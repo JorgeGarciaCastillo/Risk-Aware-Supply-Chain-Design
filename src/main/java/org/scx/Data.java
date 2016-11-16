@@ -1,4 +1,4 @@
-package org.scx.data;
+package org.scx;
 
 /**
  * Data from the SCREAM Game

@@ -20,7 +20,7 @@ import ilog.cplex.IloCplex;
  */
 public class SubproblemsExecutor {
 
-    private static final int MAX_THREADS = 4;
+    private static final int MAX_THREADS = 1;
 
     /** Executors **/
     private final ExecutorService executor;

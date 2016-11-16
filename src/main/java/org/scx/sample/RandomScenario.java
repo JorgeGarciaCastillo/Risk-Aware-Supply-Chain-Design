@@ -1,4 +1,4 @@
-package org.scx.data;
+package org.scx.sample;
 
 import java.util.Arrays;
 

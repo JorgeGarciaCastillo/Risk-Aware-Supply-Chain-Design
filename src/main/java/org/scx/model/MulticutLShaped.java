@@ -2,30 +2,31 @@ package org.scx.model;
 
 import static java.lang.Double.MAX_VALUE;
 import static java.lang.Double.MIN_VALUE;
-import static org.scx.data.Data.DC_OPTIONS;
-import static org.scx.data.Data.FOUR_DAYS_DELAY_OPTION;
-import static org.scx.data.Data.MAX_DELAY;
-import static org.scx.data.Data.MEAN_DEMAND;
-import static org.scx.data.Data.NUM_BACKUP_POLICIES;
-import static org.scx.data.Data.ONE_DAY_DELAY_OPTION;
-import static org.scx.data.Data.PLANT_CAPACITY;
-import static org.scx.data.Data.PLANT_OPTIONS;
-import static org.scx.data.Data.SIX_DAYS_DELAY_OPTION;
-import static org.scx.data.Data.SUPPLIER_CAPACITY;
-import static org.scx.data.Data.SUPPLIER_OPTIONS;
-import static org.scx.data.Data.TWO_DAYS_DELAY_OPTION;
+import static org.scx.Data.DC_OPTIONS;
+import static org.scx.Data.FOUR_DAYS_DELAY_OPTION;
+import static org.scx.Data.MAX_DELAY;
+import static org.scx.Data.MEAN_DEMAND;
+import static org.scx.Data.NUM_BACKUP_POLICIES;
+import static org.scx.Data.ONE_DAY_DELAY_OPTION;
+import static org.scx.Data.PLANT_CAPACITY;
+import static org.scx.Data.PLANT_OPTIONS;
+import static org.scx.Data.SIX_DAYS_DELAY_OPTION;
+import static org.scx.Data.SUPPLIER_CAPACITY;
+import static org.scx.Data.SUPPLIER_OPTIONS;
+import static org.scx.Data.TWO_DAYS_DELAY_OPTION;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.scx.data.Data;
-import org.scx.data.Data.BackupOption;
-import org.scx.data.RandomScenario;
+import org.scx.Data;
+import org.scx.Data.BackupOption;
 import org.scx.model.Solution.BackupPolicy;
+import org.scx.sample.RandomScenario;
 
 import ilog.concert.IloConstraint;
 import ilog.concert.IloException;
@@ -46,6 +47,7 @@ import ilog.cplex.IloCplex.UnknownObjectException;
 public class MulticutLShaped {
 
     protected IloCplex master; // the master model
+    private List<RandomScenario> scenarios;
     private List<ScenarioSubproblem> subproblems;
 
     /*
@@ -57,7 +59,7 @@ public class MulticutLShaped {
 
     // surrogate variable for production cost
     protected IloNumExpr avgProdutionCost;
-    protected IloNumVar[] produtionCost;
+    protected IloNumVar[] scenarioProductionCost;
 
     protected Map<ScenarioSubproblem, IloNumVar> scenarioToEstCost;
 
@@ -106,8 +108,9 @@ public class MulticutLShaped {
     public MulticutLShaped(List<RandomScenario> scenarios) throws IloException {
         solution = new Solution();
         scenarioToEstCost = new LinkedHashMap<>();
+        this.scenarios = scenarios;
         master = new IloCplex();
-        buildModel(scenarios);
+
     }
 
     /**
@@ -216,11 +219,11 @@ public class MulticutLShaped {
 
         // Production Cost
         int nbScenarios = subproblems.size();
-        produtionCost = master.numVarArray(nbScenarios, MIN_VALUE, MAX_VALUE, buildNames("estProductionCost", nbScenarios));
+        scenarioProductionCost = master.numVarArray(nbScenarios, MIN_VALUE, MAX_VALUE, buildNames("estProductionCost", nbScenarios));
         for (int i = 0; i < nbScenarios; i++) {
-            scenarioToEstCost.put(subproblems.get(i), produtionCost[i]);
+            scenarioToEstCost.put(subproblems.get(i), scenarioProductionCost[i]);
         }
-        avgProdutionCost = master.prod(1.0 / nbScenarios, master.sum(produtionCost));
+        avgProdutionCost = master.prod(1.0 / nbScenarios, master.sum(scenarioProductionCost));
 
         master.addMinimize(master.sum(avgProdutionCost, facBackupCost), "TotalCost");
     }
@@ -443,18 +446,17 @@ public class MulticutLShaped {
      */
     class BendersCallback extends IloCplex.LazyConstraintCallback {
 
-        private SubproblemsExecutor executor;
         private List<ScenarioSubproblem> subproblems;
 
         public BendersCallback(List<ScenarioSubproblem> subproblems) {
             this.subproblems = subproblems;
-            executor = new SubproblemsExecutor(subproblems);
         }
 
 
         @Override
         protected void main() throws IloException {
             Collection<IloRange> optimalityCuts = new ArrayList<IloRange>();
+            Map<ScenarioSubproblem, IloCplex.Status> subproblemToStatus = new HashMap<ScenarioSubproblem, IloCplex.Status>();
             for (ScenarioSubproblem subproblem : subproblems) {
                 // Values of the master variables must accesed through the callback as the master has no solution yet
                 subproblem.updateRHS(getValue(backupWIPPolicy),
@@ -465,9 +467,14 @@ public class MulticutLShaped {
                         getValues(backupPlantDelayedCapacity),
                         getValue(backupDCCapacity),
                         getValues(backupDCDelayedCapacity));
+
+                IloCplex.Status status = subproblem.solve();
+                subproblemToStatus.put(subproblem, status);
+                if (status.equals(IloCplex.Status.Infeasible)) {
+                    break;
+                }
             }
 
-            Map<ScenarioSubproblem, IloCplex.Status> subproblemToStatus = executor.solveSubproblems();
             for (Entry<ScenarioSubproblem, IloCplex.Status> entry : subproblemToStatus.entrySet()) {
                 // solve the subproblem
                 ScenarioSubproblem subproblem = entry.getKey();
@@ -551,6 +558,7 @@ public class MulticutLShaped {
      */
 
     public void solve() throws IloException {
+        buildModel(scenarios);
         configureMasterSolver();
         solveModel();
         exportModels();
@@ -607,6 +615,10 @@ public class MulticutLShaped {
      */
     public void end() {
         master.end();
+        endSubproblems();
+    }
+
+    public void endSubproblems() {
         for (ScenarioSubproblem subproblem : subproblems) {
             subproblem.end();
         }

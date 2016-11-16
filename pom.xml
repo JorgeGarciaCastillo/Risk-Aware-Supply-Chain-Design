@@ -13,6 +13,7 @@
   <properties>
     <java.version>1.8</java.version>
     <cplex.version>12.6.1</cplex.version>
+    <commons.math.version>3.6.1</commons.math.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
   
@@ -21,6 +22,15 @@
   </prerequisites>
   
   <dependencies>
+  
+        <!-- Dependency for statistical utilities -->
+		<dependency>
+		    <groupId>org.apache.commons</groupId>
+		    <artifactId>commons-math3</artifactId>
+		    <version>${commons.math.version}</version>
+		</dependency>
+
+        <!-- This dependency is not public, and should be included manualy in your own Maven Repo if you have license for CPLEX-->
         <dependency>
             <groupId>com.ibm.ilog</groupId>
             <artifactId>cplex</artifactId>
@@ -28,6 +38,7 @@
             <classifier>win64</classifier>
         </dependency>
 
+        <!-- This dependency is not public, and should be included manualy in your own Maven Repo if you have license for CPLEX -->
         <dependency>
             <groupId>com.ibm.ilog</groupId>
             <artifactId>cplex-runtime</artifactId>
