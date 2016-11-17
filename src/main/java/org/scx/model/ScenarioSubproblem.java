@@ -1,6 +1,7 @@
 package org.scx.model;
 
 import static org.scx.Data.BASE_DC_STOCK_LEVEL;
+import static org.scx.Data.DESIRED_IFR;
 import static org.scx.Data.FG_COST;
 import static org.scx.Data.FG_PRICE;
 import static org.scx.Data.IRR;
@@ -59,6 +60,7 @@ public class ScenarioSubproblem implements Callable<IloCplex.Status> {
     // Cost components
     private IloNumExpr totalLostSales;
     private IloNumExpr invCarryCost;
+    private IloNumExpr desiredIFRSlack;
 
     private IloNumExpr avgWIPInv;
     private IloNumExpr avgFGInv;
@@ -202,6 +204,7 @@ public class ScenarioSubproblem implements Callable<IloCplex.Status> {
 
     private void buildSubproblemVariables() throws IloException {
         lostSales = sub.numVarArray(WEEKS_PER_YEAR, 0.0, Double.MAX_VALUE, buildNames("lostSales", WEEKS_PER_YEAR));
+        desiredIFRSlack = sub.numVar(0.0, Double.MAX_VALUE, "desiredIFRSlack");
 
         supplierProd = sub.numVarArray(WEEKS_PER_YEAR, 0.0, Double.MAX_VALUE, buildNames("supplierProd", WEEKS_PER_YEAR));
         plantProd = sub.numVarArray(WEEKS_PER_YEAR, 0.0, Double.MAX_VALUE, buildNames("plantProd", WEEKS_PER_YEAR));
@@ -235,7 +238,7 @@ public class ScenarioSubproblem implements Callable<IloCplex.Status> {
         totalLostSales = sub.prod((FG_PRICE - FG_COST), sub.sum(lostSales));
 
         // Minimize ProductionCost
-        sub.addMinimize(sub.sum(invCarryCost, totalLostSales), "ProductionCost");
+        sub.addMinimize(sub.sum(invCarryCost, totalLostSales, sub.prod(FG_PRICE, desiredIFRSlack)), "ProductionCost");
     }
 
     private void buildSupplyStatus() throws IloException {
@@ -397,7 +400,7 @@ public class ScenarioSubproblem implements Callable<IloCplex.Status> {
         for (double demand : scenario.getRandomDemand()) {
             totalDemand += demand;
         }
-        IloRange range = sub.addGe(sub.sum(fgToCustomer), Data.DESIRED_IFR * totalDemand);
+        IloRange range = sub.addGe(sub.sum(desiredIFRSlack, sub.sum(fgToCustomer)), DESIRED_IFR * totalDemand);
         rangeToRHS.put(range, sub.linearNumExpr(Data.DESIRED_IFR * totalDemand));
     }
 

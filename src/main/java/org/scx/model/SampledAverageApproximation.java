@@ -10,6 +10,7 @@ import org.scx.sample.RandomScenario;
 import org.scx.sample.ScenarioSampler;
 
 import ilog.concert.IloException;
+import ilog.cplex.IloCplex;
 
 /**
  * "Solves" the scream problem using Sampled Average Approximation method
@@ -47,6 +48,16 @@ public class SampledAverageApproximation {
 
         System.out.println("Sampled LB : " + costLB);
         System.out.println("Sampled UB : " + costUB);
+    }
+
+    private List<MulticutLShaped> sampleMasterProblems(int m, int n) throws IloException {
+        List<MulticutLShaped> masterSolvers = new ArrayList<>();
+        for (int i = 0; i < m; i++) {
+            List<RandomScenario> scenarios = sampler.generate(5, n / 5);
+            MulticutLShaped lshaped = new MulticutLShaped(scenarios);
+            masterSolvers.add(lshaped);
+        }
+        return masterSolvers;
     }
 
     /**
@@ -94,7 +105,10 @@ public class SampledAverageApproximation {
         for (RandomScenario sample : sampler.generate(10, n2 / 10)) {
             // Create and Solve subproblem for scenario
             ScenarioSubproblem subproblem = new ScenarioSubproblem(master, sample);
-            subproblem.solve();
+            IloCplex.Status status = subproblem.solve();
+
+            assert !status.equals(IloCplex.Status.Infeasible) : "SAA requires complete recourse for 2nd stage problem";
+
             Solution subproblemSol = subproblem.recordSolution();
             subproblemSol.totalCost += master.master.getValue(master.facBackupCost);
             saaSolutions.add(subproblemSol);
@@ -106,15 +120,6 @@ public class SampledAverageApproximation {
         return new SolutionCostBound(confidence, saaSolutions.stream().map(s -> s.totalCost).collect(Collectors.toList()));
     }
 
-    private List<MulticutLShaped> sampleMasterProblems(int m, int n) throws IloException {
-        List<MulticutLShaped> masterSolvers = new ArrayList<>();
-        for (int i = 0; i < m; i++) {
-            List<RandomScenario> scenarios = sampler.generate(5, n / 5);
-            MulticutLShaped lshaped = new MulticutLShaped(scenarios);
-            masterSolvers.add(lshaped);
-        }
-        return masterSolvers;
-    }
 
     public Solution getSolution() {
         return solution;

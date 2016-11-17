@@ -225,6 +225,7 @@ public class MulticutLShaped {
         }
         avgProdutionCost = master.prod(1.0 / nbScenarios, master.sum(scenarioProductionCost));
 
+        // TODO Add regularization terms
         master.addMinimize(master.sum(avgProdutionCost, facBackupCost), "TotalCost");
     }
 
@@ -446,6 +447,7 @@ public class MulticutLShaped {
      */
     class BendersCallback extends IloCplex.LazyConstraintCallback {
 
+        // TODO Bunching of subproblems
         private List<ScenarioSubproblem> subproblems;
 
         public BendersCallback(List<ScenarioSubproblem> subproblems) {
