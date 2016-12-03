@@ -6,8 +6,12 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
+import org.scx.Scream.RiskMeasure;
+import org.scx.Solution;
 import org.scx.sample.RandomScenario;
 import org.scx.sample.ScenarioSampler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import ilog.concert.IloException;
 import ilog.cplex.IloCplex;
@@ -17,17 +21,23 @@ import ilog.cplex.IloCplex;
  */
 public class SampledAverageApproximation {
 
+    private static final Logger LOG = LoggerFactory.getLogger(SampledAverageApproximation.class);
+
     // Confidence value for bounds confidence interval
     private final double confidence;
     // Scenario sampler
     private final ScenarioSampler sampler;
 
+    // RiskMeasure
+    private final RiskMeasure riskMeasure;
+
     // Sampled solution
     private Solution solution;
 
-    public SampledAverageApproximation(double confidence, ScenarioSampler sampler) {
+    public SampledAverageApproximation(double confidence, ScenarioSampler sampler, RiskMeasure riskMeasure) {
         this.confidence = confidence;
         this.sampler = sampler;
+        this.riskMeasure = riskMeasure;
     }
 
     /**
@@ -42,75 +52,71 @@ public class SampledAverageApproximation {
      *         If something wrong happens with CPLEX
      */
     public void approximateSolution(int m, int n, int n2) throws IloException {
-        List<MulticutLShaped> masterSolvers = sampleMasterProblems(m, n);
-        SolutionCostBound costLB = computeLB(masterSolvers);
-        SolutionCostBound costUB = computeUB(n2, masterSolvers);
+        LOG.info("Sampling solution with risk {} and ({},{},{})", riskMeasure, m, n, n2);
 
-        System.out.println("Sampled LB : " + costLB);
-        System.out.println("Sampled UB : " + costUB);
-    }
+        List<Solution> solutions = sampleSolutions(m, n);
+        SolutionCostBound costLB = new SolutionCostBound(confidence, solutions.stream().map(s -> s.totalCost).collect(Collectors.toList()));
+        SolutionCostBound costUB = computeUB(n2, solutions);
 
-    private List<MulticutLShaped> sampleMasterProblems(int m, int n) throws IloException {
-        List<MulticutLShaped> masterSolvers = new ArrayList<>();
-        for (int i = 0; i < m; i++) {
-            List<RandomScenario> scenarios = sampler.generate(5, n / 5);
-            MulticutLShaped lshaped = new MulticutLShaped(scenarios);
-            masterSolvers.add(lshaped);
-        }
-        return masterSolvers;
+        LOG.info("Winning Solution : {}", solution);
+        LOG.info("Sampled LB : {} \nSampled UB : {}", costLB, costUB);
     }
 
     /**
      * Computes LB of model by sampling scenarios and solving multiple master problems
      */
-    private SolutionCostBound computeLB(List<MulticutLShaped> masterSolvers) throws IloException {
+    private List<Solution> sampleSolutions(int m, int n) throws IloException {
         List<Solution> solutions = new ArrayList<>();
-        for (MulticutLShaped master : masterSolvers) {
+        for (int i = 0; i < m; i++) {
+            List<RandomScenario> scenarios = sampler.generate(5, n / 5);
+            MulticutLShaped master = new MulticutLShaped(scenarios, riskMeasure);
+            LOG.debug(">>>> MASTER {} SCENARIOS : {}", i, scenarios);
             master.solve();
             Solution solution = master.getSolution();
             solutions.add(solution);
 
-            // Free native memory from subproblems as it will not be used anymore
-            master.endSubproblems();
+            // Free native memory in each inner iteration to avoir Out Of Memory
+            master.end();
+
         }
-        return new SolutionCostBound(confidence, solutions.stream().map(s -> s.totalCost).collect(Collectors.toList()));
+        return solutions;
     }
 
     /**
      * Computes UB of model by sampling many independent futures scenarios and solving the future decision problems with the solutions
      * obtained computing the UB
      */
-    private SolutionCostBound computeUB(int n2, List<MulticutLShaped> masterSolvers) throws IloException {
+    private SolutionCostBound computeUB(int n2, List<Solution> solutions) throws IloException {
         List<Double> ubSamples = new ArrayList<>();
         SortedMap<Double, Solution> costToSolution = new TreeMap<>();
-        for (MulticutLShaped master : masterSolvers) {
-            System.out.println("Sampling UB for Solution : " + master.getSolution());
+        for (Solution solution : solutions) {
+            System.out.println("Sampling UB for Solution : " + solution);
             long start = System.currentTimeMillis();
-            SolutionCostBound ubSample = sampleCostForSolution(n2, master);
+            SolutionCostBound ubSample = sampleCostForSolution(n2, solution);
             long end = System.currentTimeMillis();
             System.out.println("*** Elapsed time = " + (end - start) + " ms. *** " + ((end - start) / (double) n2) + "ms per scenario");
 
-            costToSolution.put(ubSample.getSampledAverage(), master.getSolution());
+            costToSolution.put(ubSample.getSampledAverage(), solution);
             ubSamples.add(ubSample.getSampledAverage());
-
-            // Free master in each outer iteration to avoid Out of Memory Error
-            master.end();
         }
         solution = costToSolution.get(costToSolution.firstKey());
         return new SolutionCostBound(confidence, ubSamples);
     }
 
-    private SolutionCostBound sampleCostForSolution(int n2, MulticutLShaped master) throws IloException {
+    private SolutionCostBound sampleCostForSolution(int n2, Solution solution) throws IloException {
         List<Solution> saaSolutions = new ArrayList<>();
+        LOG.info("{}", solution);
         for (RandomScenario sample : sampler.generate(10, n2 / 10)) {
             // Create and Solve subproblem for scenario
-            ScenarioSubproblem subproblem = new ScenarioSubproblem(master, sample);
+            ScenarioProblem subproblem = new ScenarioProblem(solution.policyData, sample);
             IloCplex.Status status = subproblem.solve();
 
             assert !status.equals(IloCplex.Status.Infeasible) : "SAA requires complete recourse for 2nd stage problem";
 
             Solution subproblemSol = subproblem.recordSolution();
-            subproblemSol.totalCost += master.master.getValue(master.facBackupCost);
+            subproblemSol.totalCost += solution.facBackupCost;
+            LOG.trace("{};{};{};{}", subproblemSol.totalCost, subproblemSol.avgLostSales, subproblemSol.invCarryCost, sample);
+
             saaSolutions.add(subproblemSol);
 
             // Free subproblem in each inner iteration to avoid Out of Memory Error
@@ -119,7 +125,6 @@ public class SampledAverageApproximation {
 
         return new SolutionCostBound(confidence, saaSolutions.stream().map(s -> s.totalCost).collect(Collectors.toList()));
     }
-
 
     public Solution getSolution() {
         return solution;

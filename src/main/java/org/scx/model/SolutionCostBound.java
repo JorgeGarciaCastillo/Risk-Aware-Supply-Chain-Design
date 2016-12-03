@@ -32,7 +32,7 @@ public class SolutionCostBound {
         this.sampledVariance = computeSampleVariance(sampledCosts);
 
         // Create T Distribution with N-1 degrees of freedom
-        TDistribution tDist = new TDistribution(sampledCosts.size() - 1);
+        TDistribution tDist = new TDistribution(Math.max(1, sampledCosts.size() - 1));
         // Calculate critical value
         double critVal = tDist.inverseCumulativeProbability(1.0 - (1 - confidence) / 2);
 

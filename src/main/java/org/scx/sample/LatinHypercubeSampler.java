@@ -11,6 +11,9 @@ import org.apache.commons.math3.distribution.IntegerDistribution;
 import org.apache.commons.math3.distribution.NormalDistribution;
 import org.apache.commons.math3.distribution.RealDistribution;
 import org.apache.commons.math3.distribution.UniformIntegerDistribution;
+import org.apache.commons.math3.distribution.ZipfDistribution;
+import org.apache.commons.math3.random.RandomGenerator;
+import org.apache.commons.math3.random.RandomGeneratorFactory;
 import org.scx.Data;
 
 /**
@@ -18,20 +21,25 @@ import org.scx.Data;
  */
 public class LatinHypercubeSampler implements ScenarioSampler {
 
-    private final Random random;
+    private final RandomGenerator generator;
     private final RealDistribution demandDistribution;
     private final IntegerDistribution disruptionDistribution;
-
+    private final IntegerDistribution disasterLengthDistribution;
 
     public LatinHypercubeSampler(Random random) {
-        this.random = random;
-        demandDistribution = new NormalDistribution(Data.MEAN_DEMAND, Data.STD_DEV);
-        disruptionDistribution = new UniformIntegerDistribution(0, WEEKS_PER_YEAR);
+        generator = RandomGeneratorFactory.createRandomGenerator(random);
+        demandDistribution = new NormalDistribution(generator, Data.MEAN_DEMAND, Data.STD_DEV);
+        disruptionDistribution = new UniformIntegerDistribution(generator, 0, WEEKS_PER_YEAR);
+        //        disasterLengthDistribution = new UniformIntegerDistribution(generator, 0, WEEKS_PER_YEAR);
+        disasterLengthDistribution = new ZipfDistribution(Data.MAX_DISRUPTION, Data.DISASTER_CASUALTY_POWER_LAW_EXPONENT);
 
     }
 
     /**
-     * Generates a list of nbDemandScenarios * nbDisasterScenarios with gaussian independent weekly demand and uniform disaster start time
+     * Generates a list of nbDemandScenarios * nbDisasterScenarios with gaussian independent weekly demand, uniform disaster start time, and
+     * Zipf distribution of disaster length.
+     * <p>
+     * Zipf distribution is a kind of "discrete power law", which is used because disaster disruption probability have fat tails
      * <p>
      * It uses LatinHypercube sampling to reduce variance and increase and reduce uncertainty in confidence interval
      * 
@@ -40,6 +48,11 @@ public class LatinHypercubeSampler implements ScenarioSampler {
      * @param nbDisasterScenarios
      *        Nb of disaster scenarios to sample
      * 
+     * @see NormalDistribution
+     * @see UniformIntegerDistribution
+     * @see ZipfDistribution
+     * 
+     *      {@link http://personal.rhul.ac.uk/uhte/014/Natural%20Disasters.pdf}
      * @return List of sampled scenarios
      */
     @Override
@@ -59,9 +72,9 @@ public class LatinHypercubeSampler implements ScenarioSampler {
             int[] randomDisruption = new int[NB_FACILITIES * 2];
             for (; j < distributionSample[i].length; j += 2) {
                 randomDisruption[j - WEEKS_PER_YEAR] = disruptionDistribution.inverseCumulativeProbability(distributionSample[i][j]);
-                randomDisruption[j + 1 - WEEKS_PER_YEAR] =
-                        new UniformIntegerDistribution(0, WEEKS_PER_YEAR - randomDisruption[j - WEEKS_PER_YEAR])
-                                .inverseCumulativeProbability(distributionSample[i][j]);
+                int disasterLenght = Math.min(disasterLengthDistribution.inverseCumulativeProbability(distributionSample[i][j + 1]),
+                        WEEKS_PER_YEAR - randomDisruption[j - WEEKS_PER_YEAR]);
+                randomDisruption[j + 1 - WEEKS_PER_YEAR] = disasterLenght;
             }
             scenarios.add(new RandomScenario(randomDemand,
                     randomDisruption[0],
@@ -91,7 +104,7 @@ public class LatinHypercubeSampler implements ScenarioSampler {
 
         for (int i = 0; i < D; i++) {
             for (int j = 0; j < N; j++) {
-                temp[j] = j * d + random.nextDouble() * ((j + 1) * d - j * d);
+                temp[j] = j * d + generator.nextDouble() * ((j + 1) * d - j * d);
             }
 
             shuffle(temp);
@@ -106,7 +119,7 @@ public class LatinHypercubeSampler implements ScenarioSampler {
 
     private void shuffle(double[] array) {
         for (int i = array.length - 1; i >= 1; i--) {
-            int j = random.nextInt(i + 1);
+            int j = generator.nextInt(i + 1);
             if (i != j) {
                 double temp = array[i];
                 array[i] = array[j];

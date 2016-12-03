@@ -1,7 +1,7 @@
 package org.scx;
 
 /**
- * Data from the SCREAM Game
+ * Data from the SCREAM Game and aditional Risk measure date
  */
 public class Data {
 
@@ -28,11 +28,22 @@ public class Data {
     public static final int MAX_DELAY = 6; // Hardwired constant to ease modeling
     public static final int NB_FACILITIES = 3;
 
-    public static int NO_DELAY_OPTION = 0;
-    public static int[] ONE_DAY_DELAY_OPTION = new int[] {3, 6};
-    public static int[] TWO_DAYS_DELAY_OPTION = new int[] {2, 5};
-    public static int FOUR_DAYS_DELAY_OPTION = 1;
-    public static int SIX_DAYS_DELAY_OPTION = 4;
+    // Risk values
+    public static final double RISK_AVERSION_FACTOR = 1e-3;
+    public static final int VARIAB_IDX_PEANLTY = 2000;
+    public static final int COST_TARGET = 60000;
+    public static final int PROB_FINANCIAL_RISK = 15000000;
+    public static final int DOWNSIDE_RISK_PENALTY = 10 * FG_PRICE;
+    // @see “Natural Disasters, Casualties and Power Laws: A Comparative Analysis with Armed Conflict” (2006) - Oscar Becerrar e.t. al.
+    public static final double DISASTER_CASUALTY_POWER_LAW_EXPONENT = 2.06;
+    public static final int MAX_DISRUPTION = 36;
+
+
+    public static final int NO_DELAY_OPTION = 0;
+    public static final int[] ONE_WEEK_DELAY_OPTION = new int[] {3, 6};
+    public static final int[] TWO_WEEK_DELAY_OPTION = new int[] {2, 5};
+    public static final int FOUR_WEEKS_DELAY_OPTION = 1;
+    public static final int SIX_WEEKS_DELAY_OPTION = 4;
 
     // Backup options
     public static final BackupOption[] SUPPLIER_OPTIONS = new BackupOption[] {

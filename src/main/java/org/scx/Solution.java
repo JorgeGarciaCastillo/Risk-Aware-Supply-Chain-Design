@@ -1,12 +1,10 @@
-package org.scx.model;
+package org.scx;
 
 import java.util.Objects;
 
-import ilog.cplex.IloCplex;
-
 
 /**
- * This is a container class to hold solutions to the problem.
+ * Container class to hold solutions to the problem.
  */
 public class Solution {
 
@@ -38,8 +36,11 @@ public class Solution {
     public double[] backupPlant;
     public double[] backupDC;
 
-    public IloCplex.CplexStatus status;
+    public BackupPoliciyData policyData;
 
+    /**
+     * Backup policy for each node
+     */
     public static class BackupPolicy {
 
         private int backupWIPInventory;
@@ -111,6 +112,34 @@ public class Solution {
                     + backupDC + "]";
         }
     }
+
+    public static class BackupPoliciyData {
+
+        public final double backupFGPolicy;
+        public final double backupWIPPolicy;
+        public final double backupSupplierCapacity;
+        public final double backupPlantCapacity;
+        public final double backupDCCapacity;
+
+        public final double[] backupSupplierDelayedCapacity;
+        public final double[] backupPlantDelayedCapacity;
+        public final double[] backupDCDelayedCapacity;
+
+        public BackupPoliciyData(double backupFGPolicy, double backupWIPPolicy, double backupSupplierCapacity, double backupPlantCapacity,
+                double backupDCCapacity, double[] backupSupplierDelayedCapacity, double[] backupPlantDelayedCapacity,
+                double[] backupDCDelayedCapacity) {
+            this.backupFGPolicy = backupFGPolicy;
+            this.backupWIPPolicy = backupWIPPolicy;
+            this.backupSupplierCapacity = backupSupplierCapacity;
+            this.backupPlantCapacity = backupPlantCapacity;
+            this.backupDCCapacity = backupDCCapacity;
+            this.backupSupplierDelayedCapacity = backupSupplierDelayedCapacity;
+            this.backupPlantDelayedCapacity = backupPlantDelayedCapacity;
+            this.backupDCDelayedCapacity = backupDCDelayedCapacity;
+        }
+
+    }
+
 
     @Override
     public String toString() {

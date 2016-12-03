@@ -11,11 +11,12 @@ public class SingleScenarioSampler implements ScenarioSampler {
     @Override
     public List<RandomScenario> generate(int nbDemandScenarios, int nbDisasterScenarios) {
         int[] randomDemand =
-                new int[] {116, 93, 84, 113, 106, 88, 82, 97, 93, 98, 103, 107, 93, 93, 120, 89, 97, 103, 110, 103, 103, 91, 95, 99, 96,
-                        97, 93, 97, 90, 104, 82, 84, 106, 96, 94, 105, 106, 95, 99, 114, 100, 98, 90, 114, 118, 103, 109, 108, 106, 83, 94,
-                        84
+                new int[] {114, 87, 97, 91, 100, 108, 88, 96, 115, 98, 105, 102, 104, 89, 106, 110, 101, 110, 90, 97, 95, 87, 97, 94, 95,
+                        103, 110, 115, 90, 86, 92, 113, 107, 98, 92, 92, 86, 105, 105, 98, 108, 100, 92, 93, 113, 92, 120, 98, 88, 111, 91,
+                        108
                 };
-        return Collections.singletonList(new RandomScenario(randomDemand, 4, 12, 8, 16, 20, 26));
+        return Collections.singletonList(new RandomScenario(randomDemand, 19, 12, 4, 4, 3, 3));
     }
+
 
 }

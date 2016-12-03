@@ -12,7 +12,8 @@ import static org.scx.Data.WIP_COST;
 
 import org.scx.Data;
 import org.scx.Data.BackupOption;
-import org.scx.model.Solution.BackupPolicy;
+import org.scx.Solution;
+import org.scx.Solution.BackupPolicy;
 import org.scx.sample.RandomScenario;
 
 import ilog.concert.IloException;
@@ -448,7 +449,6 @@ public class SingleModel {
                     dcOption.getIndex());
 
         }
-        s.status = cplex.getCplexStatus();
         return s;
     }
 

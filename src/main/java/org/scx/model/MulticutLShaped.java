@@ -1,19 +1,19 @@
 package org.scx.model;
 
 import static java.lang.Double.MAX_VALUE;
-import static java.lang.Double.MIN_VALUE;
 import static org.scx.Data.DC_OPTIONS;
-import static org.scx.Data.FOUR_DAYS_DELAY_OPTION;
+import static org.scx.Data.FOUR_WEEKS_DELAY_OPTION;
 import static org.scx.Data.MAX_DELAY;
 import static org.scx.Data.MEAN_DEMAND;
 import static org.scx.Data.NUM_BACKUP_POLICIES;
-import static org.scx.Data.ONE_DAY_DELAY_OPTION;
+import static org.scx.Data.ONE_WEEK_DELAY_OPTION;
 import static org.scx.Data.PLANT_CAPACITY;
 import static org.scx.Data.PLANT_OPTIONS;
-import static org.scx.Data.SIX_DAYS_DELAY_OPTION;
+import static org.scx.Data.SIX_WEEKS_DELAY_OPTION;
 import static org.scx.Data.SUPPLIER_CAPACITY;
 import static org.scx.Data.SUPPLIER_OPTIONS;
-import static org.scx.Data.TWO_DAYS_DELAY_OPTION;
+import static org.scx.Data.TWO_WEEK_DELAY_OPTION;
+import static org.scx.Scream.RiskMeasure.probFinancialRisk;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -23,9 +23,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.jfree.util.Log;
 import org.scx.Data;
 import org.scx.Data.BackupOption;
-import org.scx.model.Solution.BackupPolicy;
+import org.scx.Scream.RiskMeasure;
+import org.scx.Solution;
+import org.scx.Solution.BackupPoliciyData;
+import org.scx.Solution.BackupPolicy;
 import org.scx.sample.RandomScenario;
 
 import ilog.concert.IloConstraint;
@@ -47,21 +51,28 @@ import ilog.cplex.IloCplex.UnknownObjectException;
 public class MulticutLShaped {
 
     protected IloCplex master; // the master model
+    private BendersCallback bendersCallback;
+
+
+    private RiskMeasure riskMeasure;
     private List<RandomScenario> scenarios;
-    private List<ScenarioSubproblem> subproblems;
 
     /*
      * MASTER COST
      */
 
     // Backup Setup Cost
-    protected IloNumExpr facBackupCost;
+    protected IloLinearNumExpr facBackupCost;
+
+    protected IloNumExpr risk;
+    protected IloNumVar[] scenarioRisk;
+
 
     // surrogate variable for production cost
     protected IloNumExpr avgProdutionCost;
-    protected IloNumVar[] scenarioProductionCost;
+    protected IloNumVar[] scenarioCost;
 
-    protected Map<ScenarioSubproblem, IloNumVar> scenarioToEstCost;
+    protected Map<RandomScenario, IloNumVar> scenarioToEstCost;
 
     /*
      * MASTER VARIABLES
@@ -104,11 +115,13 @@ public class MulticutLShaped {
      * Escenarios para los que generar la solución
      * 
      * @param scenarios
+     * @param riskMeasure
      */
-    public MulticutLShaped(List<RandomScenario> scenarios) throws IloException {
+    public MulticutLShaped(List<RandomScenario> sampledScenarios, RiskMeasure riskMeasure) throws IloException {
         solution = new Solution();
         scenarioToEstCost = new LinkedHashMap<>();
-        this.scenarios = scenarios;
+        scenarios = sampledScenarios;
+        this.riskMeasure = riskMeasure;
         master = new IloCplex();
 
     }
@@ -118,29 +131,19 @@ public class MulticutLShaped {
      */
     private void buildModel(List<RandomScenario> scenarios) throws IloException {
         buildMasterVariables();
-        buildSubProblem(scenarios);
+        bendersCallback = new BendersCallback(scenarios);
+
         buildMasterObjective();
+        buildDownsideRiskConstraints();
         buildMasterBackupConstraints();
     }
-
-    /**
-     * Builds the subproblem for a scenario and a given backup policy
-     */
-    private void buildSubProblem(List<RandomScenario> scenarios) throws IloException {
-        subproblems = new ArrayList<>();
-        for (RandomScenario scenario : scenarios) {
-            ScenarioSubproblem subprobem = new ScenarioSubproblem(this, scenario);
-            subproblems.add(subprobem);
-        }
-    }
-
 
     /**
      * Configure solver to solve subproblems when a feasible policy is found
      */
     private void configureMasterSolver() throws IloException {
         // attach a Benders callback to the master
-        master.use(new BendersCallback(subproblems));
+        master.use(bendersCallback);
 
         // Avoid repeating presolve to not loose the solution
         master.setParam(IloCplex.IntParam.RepeatPresolve, 0);
@@ -151,6 +154,15 @@ public class MulticutLShaped {
      * 
      */
     private void buildMasterVariables() throws IloException {
+
+        // Per scenario cost
+        int nbScenarios = scenarios.size();
+        scenarioCost = master.numVarArray(nbScenarios, 0.0, MAX_VALUE, buildNames("estProductionCost", nbScenarios));
+        scenarioRisk =
+                riskMeasure.equals(probFinancialRisk) ? master.boolVarArray(nbScenarios, buildNames("scenarioDownsideRisk", nbScenarios))
+                        : master.numVarArray(nbScenarios, 0.0, MAX_VALUE, buildNames("scenarioDownsideRisk", nbScenarios));
+
+
         // Strategic inventories
         backupFGPolicy = master.numVar(0.0, Double.MAX_VALUE, "backupFGPolicy");
         backupWIPPolicy = master.numVar(0.0, Double.MAX_VALUE, "backupWIPPolicy");
@@ -206,28 +218,85 @@ public class MulticutLShaped {
      */
     private void buildMasterObjective() throws IloException {
         // BackUp Policy Cost
-        IloLinearNumExpr expr = master.linearNumExpr();
+        facBackupCost = master.linearNumExpr();
         for (int i = 0; i < Data.NUM_BACKUP_POLICIES; i++) {
-            expr.addTerm(backupSupplierPolicy[i], SUPPLIER_OPTIONS[i].getCost());
-            expr.addTerm(backupPlantPolicy[i], PLANT_OPTIONS[i].getCost());
-            expr.addTerm(backupDCPolicy[i], DC_OPTIONS[i].getCost());
+            facBackupCost.addTerm(backupSupplierPolicy[i], SUPPLIER_OPTIONS[i].getCost());
+            facBackupCost.addTerm(backupPlantPolicy[i], PLANT_OPTIONS[i].getCost());
+            facBackupCost.addTerm(backupDCPolicy[i], DC_OPTIONS[i].getCost());
         }
-        expr.addTerm(backupWIPPolicy, Data.WIP_COST / (double) Data.WEEKS_PER_YEAR);
-        expr.addTerm(backupFGPolicy, Data.FG_COST / (double) Data.WEEKS_PER_YEAR);
-
-        facBackupCost = expr;
+        facBackupCost.addTerm(backupWIPPolicy, Data.WIP_COST / (double) Data.WEEKS_PER_YEAR);
+        facBackupCost.addTerm(backupFGPolicy, Data.FG_COST / (double) Data.WEEKS_PER_YEAR);
 
         // Production Cost
-        int nbScenarios = subproblems.size();
-        scenarioProductionCost = master.numVarArray(nbScenarios, MIN_VALUE, MAX_VALUE, buildNames("estProductionCost", nbScenarios));
+        int nbScenarios = scenarios.size();
         for (int i = 0; i < nbScenarios; i++) {
-            scenarioToEstCost.put(subproblems.get(i), scenarioProductionCost[i]);
+            scenarioToEstCost.put(scenarios.get(i), scenarioCost[i]);
         }
-        avgProdutionCost = master.prod(1.0 / nbScenarios, master.sum(scenarioProductionCost));
-
-        // TODO Add regularization terms
-        master.addMinimize(master.sum(avgProdutionCost, facBackupCost), "TotalCost");
+        avgProdutionCost = master.prod(1.0 / nbScenarios, master.sum(scenarioCost));
+        risk = buildRisk();
+        master.addMinimize(master.sum(facBackupCost, avgProdutionCost, risk), "TotalCost");
     }
+
+    private IloNumExpr buildRisk() throws IloException {
+        int nbScenarios = scenarios.size();
+        IloNumExpr risk;
+        switch (riskMeasure) {
+            case robust:
+                risk = master.numExpr();
+                for (int i = 0; i < nbScenarios; i++) {
+                    IloNumExpr sum = master.negative(scenarioCost[i]);
+                    for (int j = 0; j < nbScenarios; j++) {
+                        sum = master.diff(master.prod(1.0 / nbScenarios, scenarioCost[j]), scenarioCost[i]);
+                    }
+                    risk = master.sum(risk, master.prod(Data.RISK_AVERSION_FACTOR / nbScenarios, master.prod(sum, sum)));
+                }
+                break;
+            case variabilityIdx:
+                risk = master.prod(Data.VARIAB_IDX_PEANLTY / nbScenarios, master.sum(scenarioRisk));
+                break;
+            case probFinancialRisk:
+                risk = master.prod(Data.PROB_FINANCIAL_RISK / nbScenarios, master.sum(scenarioRisk));
+                break;
+            case downsideRisk:
+                risk = master.prod(Data.DOWNSIDE_RISK_PENALTY / nbScenarios, master.sum(scenarioRisk));
+                break;
+            default:
+                risk = master.linearNumExpr(0);
+                break;
+        }
+        return risk;
+    }
+
+    /**
+     * Risk Measures Constraints
+     * 
+     * @throws IloException
+     */
+    private void buildDownsideRiskConstraints() throws IloException {
+        int nbScenarios = scenarios.size();
+        for (int i = 0; i < nbScenarios; i++) {
+            switch (riskMeasure) {
+                case variabilityIdx:
+                    risk = master.addGe(scenarioRisk[i], master.diff(scenarioCost[i], avgProdutionCost),
+                            "VariabilityIdx_" + i);
+                    break;
+                case probFinancialRisk:
+                    master.addLe(scenarioCost[i], master.sum(Data.COST_TARGET, master.prod(scenarioRisk[i], 1e6)),
+                            "ProbabilisticFinancialRisk_" + i);
+                    master.addGe(scenarioCost[i],
+                            master.sum(Data.COST_TARGET, master.prod(master.diff(1.0, scenarioRisk[i]), -1e6)),
+                            "ProbabilisticFinancialRisk2_" + i);
+                    break;
+                case downsideRisk:
+                    risk = master.addGe(scenarioRisk[i], master.diff(scenarioCost[i], Data.COST_TARGET),
+                            "downsideRiskCtr_" + i);
+                    break;
+                default:
+                    return;
+            }
+        }
+    }
+
 
     /**
      * Master problem constraints include:
@@ -252,14 +321,16 @@ public class MulticutLShaped {
         buildDCBackupOptions();
     }
 
-    private void buildDCBackupOptions() throws IloException {
-        // DC Backup Options
-        for (BackupOption option : Data.DC_OPTIONS) {
-            IloNumVar backUpActiveVar = backupDCPolicy[option.getIndex()];
-            master.addLe(backupDCOptionCapacity[option.getIndex()], master.prod(MEAN_DEMAND * option.getCapacity(), backUpActiveVar));
-            master.addEq(backupDCOptionDelay[option.getIndex()], master.prod(option.getResponseTimes(), backUpActiveVar));
+    private void buildSupplierBackupOptions() throws IloException {
+        // Supplier Backup Options
+        for (BackupOption option : Data.SUPPLIER_OPTIONS) {
+            IloNumVar backupActiveVar = backupSupplierPolicy[option.getIndex()];
+            master.addEq(backupSupplierOptionCapacity[option.getIndex()],
+                    master.prod(SUPPLIER_CAPACITY * option.getCapacity(), backupActiveVar));
+            master.addEq(backupSupplierOptionDelay[option.getIndex()], master.prod(option.getResponseTimes(), backupActiveVar));
         }
     }
+
 
     private void buildPlantBackupOptions() throws IloException {
         // Plant Backup options
@@ -270,13 +341,12 @@ public class MulticutLShaped {
         }
     }
 
-    private void buildSupplierBackupOptions() throws IloException {
-        // Supplier Backup Options
-        for (BackupOption option : Data.SUPPLIER_OPTIONS) {
-            IloNumVar backupActiveVar = backupSupplierPolicy[option.getIndex()];
-            master.addEq(backupSupplierOptionCapacity[option.getIndex()],
-                    master.prod(SUPPLIER_CAPACITY * option.getCapacity(), backupActiveVar));
-            master.addEq(backupSupplierOptionDelay[option.getIndex()], master.prod(option.getResponseTimes(), backupActiveVar));
+    private void buildDCBackupOptions() throws IloException {
+        // DC Backup Options
+        for (BackupOption option : Data.DC_OPTIONS) {
+            IloNumVar backUpActiveVar = backupDCPolicy[option.getIndex()];
+            master.addLe(backupDCOptionCapacity[option.getIndex()], master.prod(MEAN_DEMAND * option.getCapacity(), backUpActiveVar));
+            master.addEq(backupDCOptionDelay[option.getIndex()], master.prod(option.getResponseTimes(), backUpActiveVar));
         }
     }
 
@@ -314,7 +384,7 @@ public class MulticutLShaped {
      * Options with 1 day of delayed response
      */
     private void buildDelayForOneDayOptions() throws IloException {
-        for (int i : ONE_DAY_DELAY_OPTION) {
+        for (int i : ONE_WEEK_DELAY_OPTION) {
             master.add(master.ifThen(
                     master.ge(backupSupplierPolicy[i], 0.5),
                     master.and(master.eq(master.sum(backupSupplierDelayedCapacity, 1, 5), 0),
@@ -336,7 +406,7 @@ public class MulticutLShaped {
      * Options with 2 days of delayed response
      */
     private void buildDelayForTwoDaysOptions() throws IloException {
-        for (int i : TWO_DAYS_DELAY_OPTION) {
+        for (int i : TWO_WEEK_DELAY_OPTION) {
             master.add(master.ifThen(
                     master.ge(backupSupplierPolicy[i], 0.5),
                     master.and(master.eq(master.sum(backupSupplierDelayedCapacity, 2, 4), 0),
@@ -368,9 +438,10 @@ public class MulticutLShaped {
 
         for (int j = 0; j < 4; j++) {
             supplierDelays[j] =
-                    master.eq(backupSupplierDelayedCapacity[j], SUPPLIER_CAPACITY * SUPPLIER_OPTIONS[FOUR_DAYS_DELAY_OPTION].getCapacity());
-            plantDelays[j] = master.eq(backupPlantDelayedCapacity[j], PLANT_CAPACITY * PLANT_OPTIONS[FOUR_DAYS_DELAY_OPTION].getCapacity());
-            dcDelays[j] = master.eq(backupDCDelayedCapacity[j], MEAN_DEMAND * DC_OPTIONS[FOUR_DAYS_DELAY_OPTION].getCapacity());
+                    master.eq(backupSupplierDelayedCapacity[j], SUPPLIER_CAPACITY * SUPPLIER_OPTIONS[FOUR_WEEKS_DELAY_OPTION].getCapacity());
+            plantDelays[j] =
+                    master.eq(backupPlantDelayedCapacity[j], PLANT_CAPACITY * PLANT_OPTIONS[FOUR_WEEKS_DELAY_OPTION].getCapacity());
+            dcDelays[j] = master.eq(backupDCDelayedCapacity[j], MEAN_DEMAND * DC_OPTIONS[FOUR_WEEKS_DELAY_OPTION].getCapacity());
 
 
         }
@@ -382,7 +453,7 @@ public class MulticutLShaped {
 
     private void buildFourDaysDelay(IloNumVar[] backupPolicy, IloNumVar[] backupDelayedCapacity,
             IloConstraint[] delays) throws IloException {
-        master.add(master.ifThen(master.ge(backupPolicy[FOUR_DAYS_DELAY_OPTION], 0.5),
+        master.add(master.ifThen(master.ge(backupPolicy[FOUR_WEEKS_DELAY_OPTION], 0.5),
                 master.and(master.eq(master.sum(backupDelayedCapacity, 4, 2), 0), master.and(delays))));
 
     }
@@ -397,15 +468,15 @@ public class MulticutLShaped {
 
         for (int j = 0; j < MAX_DELAY; j++) {
             supplierDelays[j] =
-                    master.eq(backupSupplierDelayedCapacity[j], SUPPLIER_CAPACITY * SUPPLIER_OPTIONS[SIX_DAYS_DELAY_OPTION].getCapacity());
-            plantDelays[j] = master.eq(backupPlantDelayedCapacity[j], PLANT_CAPACITY * PLANT_OPTIONS[SIX_DAYS_DELAY_OPTION].getCapacity());
-            dcDelays[j] = master.eq(backupDCDelayedCapacity[j], MEAN_DEMAND * DC_OPTIONS[SIX_DAYS_DELAY_OPTION].getCapacity());
+                    master.eq(backupSupplierDelayedCapacity[j], SUPPLIER_CAPACITY * SUPPLIER_OPTIONS[SIX_WEEKS_DELAY_OPTION].getCapacity());
+            plantDelays[j] = master.eq(backupPlantDelayedCapacity[j], PLANT_CAPACITY * PLANT_OPTIONS[SIX_WEEKS_DELAY_OPTION].getCapacity());
+            dcDelays[j] = master.eq(backupDCDelayedCapacity[j], MEAN_DEMAND * DC_OPTIONS[SIX_WEEKS_DELAY_OPTION].getCapacity());
 
 
         }
-        master.add(master.ifThen(master.ge(backupSupplierPolicy[SIX_DAYS_DELAY_OPTION], 0.5), master.and(supplierDelays)));
-        master.add(master.ifThen(master.ge(backupPlantPolicy[SIX_DAYS_DELAY_OPTION], 0.5), master.and(plantDelays)));
-        master.add(master.ifThen(master.ge(backupDCPolicy[SIX_DAYS_DELAY_OPTION], 0.5), master.and(dcDelays)));
+        master.add(master.ifThen(master.ge(backupSupplierPolicy[SIX_WEEKS_DELAY_OPTION], 0.5), master.and(supplierDelays)));
+        master.add(master.ifThen(master.ge(backupPlantPolicy[SIX_WEEKS_DELAY_OPTION], 0.5), master.and(plantDelays)));
+        master.add(master.ifThen(master.ge(backupDCPolicy[SIX_WEEKS_DELAY_OPTION], 0.5), master.and(dcDelays)));
     }
 
 
@@ -448,41 +519,39 @@ public class MulticutLShaped {
     class BendersCallback extends IloCplex.LazyConstraintCallback {
 
         // TODO Bunching of subproblems
-        private List<ScenarioSubproblem> subproblems;
+        private List<MasterLinkedSubproblem> subproblems;
+        private int nbIters = 0;
 
-        public BendersCallback(List<ScenarioSubproblem> subproblems) {
-            this.subproblems = subproblems;
+        public BendersCallback(List<RandomScenario> scenarios) {
+            this.subproblems = new ArrayList<>();
+            long start = System.currentTimeMillis();
+            for (RandomScenario scenario : scenarios) {
+                MasterLinkedSubproblem subprobem = new MasterLinkedSubproblem(MulticutLShaped.this, null, scenario);
+                subproblems.add(subprobem);
+            }
+            long end = System.currentTimeMillis();
+            System.out.println("*** Time to build subproblems " + subproblems.size() + " subproblems = " + (end - start) + " ms. ***");
         }
-
 
         @Override
         protected void main() throws IloException {
+            nbIters++;
+
+            long start = System.currentTimeMillis();
+            BackupPoliciyData policyData = buildPolicyData();
+            Map<MasterLinkedSubproblem, IloCplex.Status> subproblemToStatus = solveSubproblems(policyData);
+            long end = System.currentTimeMillis();
+            System.out.println("*** Solved " + subproblems.size() + " subproblems = " + (end - start) + " ms. (" + (end - start)
+                    / (double) subproblems.size() + "ms/p) ***");
+
             Collection<IloRange> optimalityCuts = new ArrayList<IloRange>();
-            Map<ScenarioSubproblem, IloCplex.Status> subproblemToStatus = new HashMap<ScenarioSubproblem, IloCplex.Status>();
-            for (ScenarioSubproblem subproblem : subproblems) {
-                // Values of the master variables must accesed through the callback as the master has no solution yet
-                subproblem.updateRHS(getValue(backupWIPPolicy),
-                        getValue(backupFGPolicy),
-                        getValue(backupSupplierCapacity),
-                        getValues(backupSupplierDelayedCapacity),
-                        getValue(backupPlantCapacity),
-                        getValues(backupPlantDelayedCapacity),
-                        getValue(backupDCCapacity),
-                        getValues(backupDCDelayedCapacity));
-
-                IloCplex.Status status = subproblem.solve();
-                subproblemToStatus.put(subproblem, status);
-                if (status.equals(IloCplex.Status.Infeasible)) {
-                    break;
-                }
-            }
-
-            for (Entry<ScenarioSubproblem, IloCplex.Status> entry : subproblemToStatus.entrySet()) {
+            for (Entry<MasterLinkedSubproblem, IloCplex.Status> entry : subproblemToStatus.entrySet()) {
                 // solve the subproblem
-                ScenarioSubproblem subproblem = entry.getKey();
+                MasterLinkedSubproblem subproblem = entry.getKey();
                 IloCplex.Status status = entry.getValue();
-                IloNumVar estProdCost = scenarioToEstCost.get(subproblem);
+                IloNumVar estProdCost = scenarioToEstCost.get(subproblem.getScenario());
 
+                // If scenario is infeasible we add the feasibility cut and return to the master adding no optimality cuts
                 if (status.equals(IloCplex.Status.Infeasible)) {
                     IloRange range = createFeasibilityCut(subproblem);
                     add(range);
@@ -503,8 +572,10 @@ public class MulticutLShaped {
             }
             for (IloRange range : optimalityCuts) {
                 add(range);
-                System.out.println(">>> Adding optimality cut: " + range);
             }
+
+            System.out.println(">>> Added " + optimalityCuts.size() + " optimality cuts");
+
 
             // the master and subproblem production costs match
             // -- record the one subproblem production in case this proves to be the 
@@ -517,7 +588,25 @@ public class MulticutLShaped {
 
         }
 
-        private IloRange createOptimalityCut(ScenarioSubproblem subproblem, IloNumVar estProdCost) throws UnknownObjectException,
+        private Map<MasterLinkedSubproblem, IloCplex.Status> solveSubproblems(BackupPoliciyData policyData) throws IloException {
+            Map<MasterLinkedSubproblem, IloCplex.Status> subproblemToStatus = new HashMap<MasterLinkedSubproblem, IloCplex.Status>();
+            for (MasterLinkedSubproblem subproblem : subproblems) {
+                // Values of the master variables must accesed through the callback as the master has no solution yet
+                subproblem.updateRHS(policyData);
+
+                IloCplex.Status status = subproblem.solve();
+                subproblemToStatus.put(subproblem, status);
+                if (status.equals(IloCplex.Status.Infeasible)) {
+                    break;
+                }
+                if (Log.isDebugEnabled()) {
+                    //                subproblem.export();
+                }
+            }
+            return subproblemToStatus;
+        }
+
+        private IloRange createOptimalityCut(MasterLinkedSubproblem subproblem, IloNumVar estProdCost) throws UnknownObjectException,
                 IloException {
             IloNumExpr expr = master.numExpr();
 
@@ -531,7 +620,7 @@ public class MulticutLShaped {
             return (IloRange) master.ge(estProdCost, expr);
         }
 
-        private IloRange createFeasibilityCut(ScenarioSubproblem subproblem) throws IloException {
+        private IloRange createFeasibilityCut(MasterLinkedSubproblem subproblem) throws IloException {
             IloNumExpr expr = master.numExpr();
 
             // subproblem is infeasible -- add a feasibility cut
@@ -549,6 +638,23 @@ public class MulticutLShaped {
             // add a feasibility cut
             return master.le(master.sum(temp, expr), 0);
         }
+
+        public List<MasterLinkedSubproblem> getSubproblems() {
+            return subproblems;
+        }
+
+        private BackupPoliciyData buildPolicyData() throws IloException {
+            return new BackupPoliciyData(getValue(backupFGPolicy),
+                    getValue(backupWIPPolicy),
+                    getValue(backupSupplierCapacity),
+                    getValue(backupPlantCapacity),
+                    getValue(backupDCCapacity),
+                    getValues(backupSupplierDelayedCapacity),
+                    getValues(backupPlantDelayedCapacity),
+                    getValues(backupDCDelayedCapacity));
+        }
+
+
     }
 
     /**
@@ -566,17 +672,13 @@ public class MulticutLShaped {
         exportModels();
     }
 
-    public Solution getSolution() {
-        return solution;
-    }
-
     /**
      * Exports models to file to work with them
      */
     private void exportModels() throws IloException {
         master.exportModel("ScreamBenders.lp");
-        master.exportModel("ScreamBenders.sav");
-        master.writeParam("ScreamBenders.prm");
+        //        master.exportModel("ScreamBenders.sav");
+        //        master.writeParam("ScreamBenders.prm");
     }
 
     /**
@@ -584,32 +686,34 @@ public class MulticutLShaped {
      */
     private void solveModel() throws IloException, UnknownObjectException {
         if (master.solve()) {
-            subproblems.get(0).updateRHS(master.getValue(backupWIPPolicy),
-                    master.getValue(backupFGPolicy),
-                    master.getValue(backupSupplierCapacity),
-                    master.getValues(backupSupplierDelayedCapacity),
-                    master.getValue(backupPlantCapacity),
-                    master.getValues(backupPlantDelayedCapacity),
-                    master.getValue(backupDCCapacity),
-                    master.getValues(backupDCDelayedCapacity));
-            subproblems.get(0).solve();
-            solution = subproblems.get(0).recordSolution();
-
-
-            solution.totalCost = master.getObjValue();
-            solution.facBackupCost = master.getValue(facBackupCost);
-            solution.negativeRevenue = 0.0; // TODO
-            BackupOption supplierOption = getOption(Data.SUPPLIER_OPTIONS, master.getValues(backupSupplierPolicy));
-            BackupOption plantOption = getOption(Data.PLANT_OPTIONS, master.getValues(backupPlantPolicy));
-            BackupOption dcOption = getOption(Data.DC_OPTIONS, master.getValues(backupDCPolicy));
-
-            solution.backupPolicy = new BackupPolicy(supplierOption.getIndex(),
-                    (int) master.getValue(backupWIPPolicy),
-                    plantOption.getIndex(),
-                    (int) master.getValue(backupFGPolicy),
-                    dcOption.getIndex());
+            System.out.println("Nb of InnerIters = " + bendersCallback.nbIters);
+            recordSolution();
         }
-        solution.status = master.getCplexStatus();
+    }
+
+    /**
+     * Records Master problem policy and first subproblem distribution policy
+     */
+    private void recordSolution() throws IloException, UnknownObjectException {
+        BackupPoliciyData policyData = buildPolicyData();
+        bendersCallback.getSubproblems().get(0).updateRHS(policyData);
+        bendersCallback.getSubproblems().get(0).solve();
+        solution = bendersCallback.getSubproblems().get(0).recordSolution();
+
+
+        solution.totalCost = master.getBestObjValue();
+
+        solution.facBackupCost = master.getValue(facBackupCost);
+        solution.policyData = policyData;
+        BackupOption supplierOption = getOption(Data.SUPPLIER_OPTIONS, master.getValues(backupSupplierPolicy));
+        BackupOption plantOption = getOption(Data.PLANT_OPTIONS, master.getValues(backupPlantPolicy));
+        BackupOption dcOption = getOption(Data.DC_OPTIONS, master.getValues(backupDCPolicy));
+
+        solution.backupPolicy = new BackupPolicy(supplierOption.getIndex(),
+                (int) master.getValue(backupWIPPolicy),
+                plantOption.getIndex(),
+                (int) master.getValue(backupFGPolicy),
+                dcOption.getIndex());
     }
 
     /**
@@ -617,13 +721,13 @@ public class MulticutLShaped {
      */
     public void end() {
         master.end();
-        endSubproblems();
-    }
-
-    public void endSubproblems() {
-        for (ScenarioSubproblem subproblem : subproblems) {
+        for (MasterLinkedSubproblem subproblem : bendersCallback.getSubproblems()) {
             subproblem.end();
         }
+    }
+
+    public Solution getSolution() {
+        return solution;
     }
 
     // ----------- Aux Methods -----------
@@ -646,5 +750,15 @@ public class MulticutLShaped {
         return choosenOption;
     }
 
+    private BackupPoliciyData buildPolicyData() throws IloException {
+        return new BackupPoliciyData(master.getValue(backupFGPolicy),
+                master.getValue(backupWIPPolicy),
+                master.getValue(backupSupplierCapacity),
+                master.getValue(backupPlantCapacity),
+                master.getValue(backupDCCapacity),
+                master.getValues(backupSupplierDelayedCapacity),
+                master.getValues(backupPlantDelayedCapacity),
+                master.getValues(backupDCDelayedCapacity));
+    }
 
 }

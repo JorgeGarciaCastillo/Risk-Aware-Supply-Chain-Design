@@ -9,25 +9,38 @@ import java.util.Random;
 import org.scx.model.MulticutLShaped;
 import org.scx.model.SampledAverageApproximation;
 import org.scx.model.SingleModel;
-import org.scx.model.Solution;
 import org.scx.sample.LatinHypercubeSampler;
-import org.scx.sample.MonteCarloSampler;
 import org.scx.sample.RandomScenario;
 import org.scx.sample.SingleScenarioSampler;
 
 import ilog.concert.IloException;
 
 /**
- * This the main class to solve a very close approximation of the Scream game
+ * Main class to solve a very close approximation of the Scream game
  */
 public class Scream {
 
-    private enum Model {
+    /**
+     * Solving algorithms
+     */
+    public enum Model {
         deterministic, discrete, full;
     }
 
+    /**
+     * Risk measures available for decomposed algorithms
+     */
+    public enum RiskMeasure {
+        neutral, robust, variabilityIdx, probFinancialRisk, downsideRisk;
+    }
+
     public static void main(String[] args) {
-        Model model = args != null && args.length > 0 ? Model.valueOf(args[0]) : Model.full;
+        Model model = args != null && args.length > 0 ? Model.valueOf(args[0]) : Model.discrete;
+        RiskMeasure riskMeasure = args != null && args.length > 0 ? RiskMeasure.valueOf(args[1]) : RiskMeasure.neutral;
+        int m = args != null && args.length > 0 ? Integer.valueOf(args[2]) : 2;
+        int n = args != null && args.length > 0 ? Integer.valueOf(args[3]) : 1000;
+        int n2 = args != null && args.length > 0 ? Integer.valueOf(args[4]) : 5000;
+
         Random random = new Random(0);
         switch (model) {
             case deterministic:
@@ -35,11 +48,10 @@ public class Scream {
                 solveUnified(scenario);
                 break;
             case discrete:
-                List<RandomScenario> scenarios = new MonteCarloSampler(random).generate(10, 10);
-                solveDiscretizedScenarios(scenarios);
+                solveDiscretizedScenarios(random, riskMeasure);
                 break;
             case full:
-                solveFullStochastic(random);
+                solveFullStochastic(random, riskMeasure, m, n, n2);
                 break;
             default:
                 throw new IllegalStateException("Incorrect model name : " + Arrays.toString(Model.values()));
@@ -48,12 +60,14 @@ public class Scream {
 
     /**
      * Solves the sample average approximation model
+     * 
+     * @param riskMeasure
      */
-    private static void solveFullStochastic(Random random) {
+    private static void solveFullStochastic(Random random, RiskMeasure riskMeasure, int m, int n, int n2) {
         try {
             long start = System.currentTimeMillis();
-            SampledAverageApproximation saa = new SampledAverageApproximation(0.95, new LatinHypercubeSampler(random));
-            saa.approximateSolution(10, 50, 500);
+            SampledAverageApproximation saa = new SampledAverageApproximation(0.95, new LatinHypercubeSampler(random), riskMeasure);
+            saa.approximateSolution(m, n, n2);
             Solution s = saa.getSolution();
             long end = System.currentTimeMillis();
             display(s);
@@ -65,11 +79,14 @@ public class Scream {
 
     /**
      * Solves the full stochastic model
+     * 
+     * @param riskMeasure
      */
-    private static void solveDiscretizedScenarios(List<RandomScenario> scenarios) {
+    private static void solveDiscretizedScenarios(Random random, RiskMeasure riskMeasure) {
         try {
             long start = System.currentTimeMillis();
-            MulticutLShaped model = new MulticutLShaped(scenarios);
+            List<RandomScenario> scenarios = new LatinHypercubeSampler(random).generate(5, 200);
+            MulticutLShaped model = new MulticutLShaped(scenarios, riskMeasure);
             model.solve();
             Solution s = model.getSolution();
             long end = System.currentTimeMillis();

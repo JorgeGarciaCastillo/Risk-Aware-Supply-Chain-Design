@@ -91,11 +91,9 @@ public class RandomScenario {
 
     @Override
     public String toString() {
-        return "RandomScenario {randomDemand=" + Arrays.toString(randomDemand) + ","
-                + "Supplier Disruption=[" + supplierDisruptionStart + ", " + getSupplierDisruptionEnd() + "]"
-                + "Plant Disruption=[" + plantDisruptionStart + ", " + getPlantDisruptionEnd() + "]"
-                + "DC Disruption=[" + dcDisruptionStart + ", " + getDcDisruptionEnd() + "]}";
+        return "RandomScenario {Supplier Disruption=[" + supplierDisruptionStart + ", " + supplierDisruptionDuration + "],"
+                + "Plant Disruption=[" + plantDisruptionStart + ", " + plantDisruptionDuration + "],"
+                + "DC Disruption=[" + dcDisruptionStart + ", " + dcDisruptionDuration + "], randomDemand=" + Arrays.toString(randomDemand)
+                + "]}";
     }
-
-
 }
