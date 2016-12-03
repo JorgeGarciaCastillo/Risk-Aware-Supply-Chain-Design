@@ -44,3 +44,10 @@ To run the code it is required:
 mvn clean install
 mvn exec:java
 ```
+
+Arguments can be included to select algorithm and risk measure of choice:
+
+```
+mvn exec:java -Dexec.args="full robust"
+mvn exec:java -Dexec.args="discrete downsideRisk"
+```
