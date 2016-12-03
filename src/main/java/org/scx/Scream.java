@@ -36,10 +36,10 @@ public class Scream {
 
     public static void main(String[] args) {
         Model model = args != null && args.length > 0 ? Model.valueOf(args[0]) : Model.discrete;
-        RiskMeasure riskMeasure = args != null && args.length > 0 ? RiskMeasure.valueOf(args[1]) : RiskMeasure.neutral;
-        int m = args != null && args.length > 0 ? Integer.valueOf(args[2]) : 2;
-        int n = args != null && args.length > 0 ? Integer.valueOf(args[3]) : 1000;
-        int n2 = args != null && args.length > 0 ? Integer.valueOf(args[4]) : 5000;
+        RiskMeasure riskMeasure = args != null && args.length > 1 ? RiskMeasure.valueOf(args[1]) : RiskMeasure.neutral;
+        int m = args != null && args.length > 2 ? Integer.valueOf(args[2]) : 2;
+        int n = args != null && args.length > 3 ? Integer.valueOf(args[3]) : 1000;
+        int n2 = args != null && args.length > 4 ? Integer.valueOf(args[4]) : 5000;
 
         Random random = new Random(0);
         switch (model) {
@@ -48,7 +48,7 @@ public class Scream {
                 solveUnified(scenario);
                 break;
             case discrete:
-                solveDiscretizedScenarios(random, riskMeasure);
+                solveDiscretizedScenarios(random, n, riskMeasure);
                 break;
             case full:
                 solveFullStochastic(random, riskMeasure, m, n, n2);
@@ -82,10 +82,10 @@ public class Scream {
      * 
      * @param riskMeasure
      */
-    private static void solveDiscretizedScenarios(Random random, RiskMeasure riskMeasure) {
+    private static void solveDiscretizedScenarios(Random random, int n, RiskMeasure riskMeasure) {
         try {
             long start = System.currentTimeMillis();
-            List<RandomScenario> scenarios = new LatinHypercubeSampler(random).generate(5, 200);
+            List<RandomScenario> scenarios = new LatinHypercubeSampler(random).generate(5, n / 5);
             MulticutLShaped model = new MulticutLShaped(scenarios, riskMeasure);
             model.solve();
             Solution s = model.getSolution();

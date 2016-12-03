@@ -96,6 +96,10 @@
 		    <mainClass>org.scx.Scream</mainClass>
 		    <arguments>
 		      <argument>discrete</argument>
+              <argument>neutral</argument>
+              <argument>2</argument>
+              <argument>1000</argument>
+              <argument>5000</argument>
 		    </arguments>
 		  </configuration>
 		</plugin>
