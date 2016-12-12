@@ -5,6 +5,7 @@ import static org.scx.Data.DC_OPTIONS;
 import static org.scx.Data.FOUR_WEEKS_DELAY_OPTION;
 import static org.scx.Data.MAX_DELAY;
 import static org.scx.Data.MEAN_DEMAND;
+import static org.scx.Data.NO_DELAY_OPTION;
 import static org.scx.Data.NUM_BACKUP_POLICIES;
 import static org.scx.Data.ONE_WEEK_DELAY_OPTION;
 import static org.scx.Data.PLANT_CAPACITY;
@@ -16,6 +17,7 @@ import static org.scx.Data.TWO_WEEK_DELAY_OPTION;
 import static org.scx.Scream.RiskMeasure.probFinancialRisk;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -23,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.jfree.util.Log;
 import org.scx.Data;
 import org.scx.Data.BackupOption;
 import org.scx.Scream.RiskMeasure;
@@ -31,6 +32,8 @@ import org.scx.Solution;
 import org.scx.Solution.BackupPoliciyData;
 import org.scx.Solution.BackupPolicy;
 import org.scx.sample.RandomScenario;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import ilog.concert.IloConstraint;
 import ilog.concert.IloException;
@@ -49,6 +52,8 @@ import ilog.cplex.IloCplex.UnknownObjectException;
  * The subproblem (LP) determines inventory flow for a given policy and a given demand realization
  */
 public class MulticutLShaped {
+
+    private static final Logger LOG = LoggerFactory.getLogger(MulticutLShaped.class);
 
     protected IloCplex master; // the master model
     private BendersCallback bendersCallback;
@@ -364,121 +369,30 @@ public class MulticutLShaped {
      * Link delayed capacity with each posible option
      */
     private void buildOptionsDelay() throws IloException {
-        buildNoDelayOptions();
-        buildDelayForOneDayOptions();
-        buildDelayForTwoDaysOptions();
-        buildDelayForFourDaysOptions();
-        buildDelayForSixDaysOptions();
-    }
+        for (int[] sameDelayOptions : Arrays.asList(new int[] {NO_DELAY_OPTION}, ONE_WEEK_DELAY_OPTION, TWO_WEEK_DELAY_OPTION,
+                new int[] {FOUR_WEEKS_DELAY_OPTION}, new int[] {SIX_WEEKS_DELAY_OPTION})) {
+            for (int j : sameDelayOptions) {
+                int delay = SUPPLIER_OPTIONS[j].getResponseTimes();
 
-    /**
-     * No delay options
-     */
-    private void buildNoDelayOptions() throws IloException {
-        master.add(master.ifThen(master.ge(backupSupplierPolicy[0], 0.5), master.eq(master.sum(backupSupplierDelayedCapacity), 0)));
-        master.add(master.ifThen(master.ge(backupPlantPolicy[0], 0.5), master.eq(master.sum(backupPlantDelayedCapacity), 0)));
-        master.add(master.ifThen(master.ge(backupDCPolicy[0], 0.5), master.eq(master.sum(backupDCDelayedCapacity), 0)));
-    }
+                if (delay < MAX_DELAY) {
+                    master.addLe(master.sum(backupSupplierDelayedCapacity, delay, MAX_DELAY - delay),
+                            master.prod(SUPPLIER_CAPACITY, master.diff(1.0, backupSupplierPolicy[j])));
+                    master.addLe(master.sum(backupPlantDelayedCapacity, delay, MAX_DELAY - delay),
+                            master.prod(PLANT_CAPACITY, master.diff(1.0, backupPlantPolicy[j])));
+                    master.addLe(master.sum(backupDCDelayedCapacity, delay, MAX_DELAY - delay),
+                            master.prod(MEAN_DEMAND, master.diff(1.0, backupDCPolicy[j])));
+                }
 
-    /**
-     * Options with 1 day of delayed response
-     */
-    private void buildDelayForOneDayOptions() throws IloException {
-        for (int i : ONE_WEEK_DELAY_OPTION) {
-            master.add(master.ifThen(
-                    master.ge(backupSupplierPolicy[i], 0.5),
-                    master.and(master.eq(master.sum(backupSupplierDelayedCapacity, 1, 5), 0),
-                            master.eq(backupSupplierDelayedCapacity[0], SUPPLIER_CAPACITY * SUPPLIER_OPTIONS[i].getCapacity()))));
-
-            master.add(master.ifThen(
-                    master.ge(backupPlantPolicy[i], 0.5),
-                    master.and(master.eq(master.sum(backupPlantDelayedCapacity, 1, 5), 0),
-                            master.eq(backupPlantDelayedCapacity[0], PLANT_CAPACITY * PLANT_OPTIONS[i].getCapacity()))));
-
-            master.add(master.ifThen(
-                    master.ge(backupDCPolicy[i], 0.5),
-                    master.and(master.eq(master.sum(backupDCDelayedCapacity, 1, 5), 0),
-                            master.eq(backupDCDelayedCapacity[0], MEAN_DEMAND * DC_OPTIONS[i].getCapacity()))));
+                for (int i = 0; i < delay && i < MAX_DELAY; i++) {
+                    master.addGe(backupSupplierDelayedCapacity[i],
+                            master.prod(SUPPLIER_CAPACITY * SUPPLIER_OPTIONS[j].getCapacity(), backupSupplierPolicy[j]));
+                    master.addGe(backupPlantDelayedCapacity[i],
+                            master.prod(PLANT_CAPACITY * PLANT_OPTIONS[j].getCapacity(), backupPlantPolicy[j]));
+                    master.addGe(backupDCDelayedCapacity[i], master.prod(MEAN_DEMAND * DC_OPTIONS[j].getCapacity(), backupDCPolicy[j]));
+                }
+            }
         }
     }
-
-    /**
-     * Options with 2 days of delayed response
-     */
-    private void buildDelayForTwoDaysOptions() throws IloException {
-        for (int i : TWO_WEEK_DELAY_OPTION) {
-            master.add(master.ifThen(
-                    master.ge(backupSupplierPolicy[i], 0.5),
-                    master.and(master.eq(master.sum(backupSupplierDelayedCapacity, 2, 4), 0),
-                            master.and(master.eq(backupSupplierDelayedCapacity[0], SUPPLIER_CAPACITY * SUPPLIER_OPTIONS[i].getCapacity()),
-                                    master.eq(backupSupplierDelayedCapacity[1], SUPPLIER_CAPACITY * SUPPLIER_OPTIONS[i].getCapacity())))));
-            master.add(master.ifThen(
-                    master.ge(backupPlantPolicy[i], 0.5),
-                    master.and(master.eq(master.sum(backupPlantDelayedCapacity, 2, 4), 0),
-                            master.and(master.eq(backupPlantDelayedCapacity[0], PLANT_CAPACITY * PLANT_OPTIONS[i].getCapacity()),
-                                    master.eq(backupPlantDelayedCapacity[1], PLANT_CAPACITY * PLANT_OPTIONS[i].getCapacity())))));
-
-            master.add(master.ifThen(
-                    master.ge(backupDCPolicy[i], 0.5),
-                    master.and(master.eq(master.sum(backupDCDelayedCapacity, 2, 4), 0),
-                            master.and(
-                                    master.eq(backupDCDelayedCapacity[0], MEAN_DEMAND * DC_OPTIONS[i].getCapacity()),
-                                    master.eq(backupDCDelayedCapacity[1], MEAN_DEMAND * DC_OPTIONS[i].getCapacity())))));
-        }
-    }
-
-    /**
-     * Options with 4 days of delayed response
-     */
-    private void buildDelayForFourDaysOptions() throws IloException {
-
-        IloConstraint[] supplierDelays = new IloConstraint[MAX_DELAY];
-        IloConstraint[] plantDelays = new IloConstraint[MAX_DELAY];
-        IloConstraint[] dcDelays = new IloConstraint[MAX_DELAY];
-
-        for (int j = 0; j < 4; j++) {
-            supplierDelays[j] =
-                    master.eq(backupSupplierDelayedCapacity[j], SUPPLIER_CAPACITY * SUPPLIER_OPTIONS[FOUR_WEEKS_DELAY_OPTION].getCapacity());
-            plantDelays[j] =
-                    master.eq(backupPlantDelayedCapacity[j], PLANT_CAPACITY * PLANT_OPTIONS[FOUR_WEEKS_DELAY_OPTION].getCapacity());
-            dcDelays[j] = master.eq(backupDCDelayedCapacity[j], MEAN_DEMAND * DC_OPTIONS[FOUR_WEEKS_DELAY_OPTION].getCapacity());
-
-
-        }
-
-        buildFourDaysDelay(backupSupplierPolicy, backupSupplierDelayedCapacity, supplierDelays);
-        buildFourDaysDelay(backupPlantPolicy, backupPlantDelayedCapacity, plantDelays);
-        buildFourDaysDelay(backupDCPolicy, backupDCDelayedCapacity, dcDelays);
-    }
-
-    private void buildFourDaysDelay(IloNumVar[] backupPolicy, IloNumVar[] backupDelayedCapacity,
-            IloConstraint[] delays) throws IloException {
-        master.add(master.ifThen(master.ge(backupPolicy[FOUR_WEEKS_DELAY_OPTION], 0.5),
-                master.and(master.eq(master.sum(backupDelayedCapacity, 4, 2), 0), master.and(delays))));
-
-    }
-
-    /**
-     * Option with 6 days of delayed response
-     */
-    private void buildDelayForSixDaysOptions() throws IloException {
-        IloConstraint[] supplierDelays = new IloConstraint[MAX_DELAY];
-        IloConstraint[] plantDelays = new IloConstraint[MAX_DELAY];
-        IloConstraint[] dcDelays = new IloConstraint[MAX_DELAY];
-
-        for (int j = 0; j < MAX_DELAY; j++) {
-            supplierDelays[j] =
-                    master.eq(backupSupplierDelayedCapacity[j], SUPPLIER_CAPACITY * SUPPLIER_OPTIONS[SIX_WEEKS_DELAY_OPTION].getCapacity());
-            plantDelays[j] = master.eq(backupPlantDelayedCapacity[j], PLANT_CAPACITY * PLANT_OPTIONS[SIX_WEEKS_DELAY_OPTION].getCapacity());
-            dcDelays[j] = master.eq(backupDCDelayedCapacity[j], MEAN_DEMAND * DC_OPTIONS[SIX_WEEKS_DELAY_OPTION].getCapacity());
-
-
-        }
-        master.add(master.ifThen(master.ge(backupSupplierPolicy[SIX_WEEKS_DELAY_OPTION], 0.5), master.and(supplierDelays)));
-        master.add(master.ifThen(master.ge(backupPlantPolicy[SIX_WEEKS_DELAY_OPTION], 0.5), master.and(plantDelays)));
-        master.add(master.ifThen(master.ge(backupDCPolicy[SIX_WEEKS_DELAY_OPTION], 0.5), master.and(dcDelays)));
-    }
-
 
     /**
      * Capacity must be the one of the chosen option
@@ -599,8 +513,8 @@ public class MulticutLShaped {
                 if (status.equals(IloCplex.Status.Infeasible)) {
                     break;
                 }
-                if (Log.isDebugEnabled()) {
-                    //                subproblem.export();
+                if (LOG.isDebugEnabled()) {
+                    subproblem.export();
                 }
             }
             return subproblemToStatus;

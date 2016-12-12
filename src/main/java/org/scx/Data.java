@@ -31,8 +31,8 @@ public class Data {
     // Risk values
     public static final double RISK_AVERSION_FACTOR = 1e-3;
     public static final int VARIAB_IDX_PEANLTY = 2000;
-    public static final int COST_TARGET = 60000;
-    public static final int PROB_FINANCIAL_RISK = 15000000;
+    public static final int COST_TARGET = 125000;
+    public static final int PROB_FINANCIAL_RISK = 15000;
     public static final int DOWNSIDE_RISK_PENALTY = 10 * FG_PRICE;
     // @see “Natural Disasters, Casualties and Power Laws: A Comparative Analysis with Armed Conflict” (2006) - Oscar Becerrar e.t. al.
     public static final double DISASTER_CASUALTY_POWER_LAW_EXPONENT = 2.06;

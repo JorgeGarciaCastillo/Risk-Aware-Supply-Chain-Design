@@ -15,7 +15,7 @@ public class SingleScenarioSampler implements ScenarioSampler {
                         103, 110, 115, 90, 86, 92, 113, 107, 98, 92, 92, 86, 105, 105, 98, 108, 100, 92, 93, 113, 92, 120, 98, 88, 111, 91,
                         108
                 };
-        return Collections.singletonList(new RandomScenario(randomDemand, 19, 12, 4, 4, 3, 3));
+        return Collections.singletonList(new RandomScenario(randomDemand, 19, 12, 4, 14, 3, 7));
     }
 
 

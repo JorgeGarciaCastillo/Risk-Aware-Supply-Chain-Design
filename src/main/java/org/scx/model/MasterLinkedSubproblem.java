@@ -146,30 +146,25 @@ public class MasterLinkedSubproblem extends ScenarioProblem implements Callable<
             wipAvailabilityC[i] =
                     sub.addEq(sub.sum(supplierProd[i], backupWIPTransfer[i], backupSupplier[i], sub.negative(wip[i])), 0, "WIP" + i);
             rangeToRHS.put(wipAvailabilityC[i], master.linearIntExpr(0));
-
             // Supplier RHS Balance
             backupSupplierBalance[i] = sub.addEq(backupSupplier[i], 0.0, "BackupSupplierBalance" + i);
             IloNumExpr ctrRHS =
                     scenario.isSupplierDisrupted(i) ? ((i - scenario.getSupplierDisruptionStart()) >= MAX_DELAY)
                             ? backupSupplierCapacity
-                            : master.sum(backupSupplierCapacity,
-                                    master.negative(backupSupplierDelayedCapacity[i - scenario.getSupplierDisruptionStart()]))
+                            : master.diff(backupSupplierCapacity, backupSupplierDelayedCapacity[i - scenario.getSupplierDisruptionStart()])
                             : master.linearIntExpr(0);
             rangeToRHS.put(backupSupplierBalance[i], ctrRHS);
 
             // FG to DC availability - backupPlant
             fgToDCAvailabilityC[i] = sub.addEq(sub.sum(plantProd[i], backupPlant[i], sub.negative(fgToDC[i])), 0, "FGtoDC" + i);
             rangeToRHS.put(fgToDCAvailabilityC[i], master.linearIntExpr(0));
-
             // Plant RHS Balance
             backupPlantBalance[i] = sub.addEq(backupPlant[i], 0.0, "BackupPlantBalance" + i);
             ctrRHS = scenario.isPlantDisrupted(i) ? ((i - scenario.getPlantDisruptionStart()) >= MAX_DELAY)
                     ? backupPlantCapacity
-                    : master.sum(backupPlantCapacity, master.negative(backupPlantDelayedCapacity[i - scenario.getPlantDisruptionStart()]))
+                    : master.diff(backupPlantCapacity, backupPlantDelayedCapacity[i - scenario.getPlantDisruptionStart()])
                     : master.linearIntExpr(0);
             rangeToRHS.put(backupPlantBalance[i], ctrRHS);
-
-
             // FG to Customer availability - backupDC
             fgToCustomerAvailabilityC[i] =
                     sub.addEq(sub.sum(dcTransfer[i], backupFGTransfer[i], backupDC[i], sub.negative(fgToCustomer[i])), 0, "FGtoCustomer"
@@ -180,7 +175,7 @@ public class MasterLinkedSubproblem extends ScenarioProblem implements Callable<
             backupDCBalance[i] = sub.addEq(backupDC[i], 0.0, "BackupDCBalance" + i);
             ctrRHS = scenario.isDcDisrupted(i) ? ((i - scenario.getDcDisruptionStart()) >= MAX_DELAY)
                     ? backupDCCapacity
-                    : master.sum(backupDCCapacity, master.negative(backupDCDelayedCapacity[i - scenario.getDcDisruptionStart()]))
+                    : master.diff(backupDCCapacity, backupDCDelayedCapacity[i - scenario.getDcDisruptionStart()])
                     : master.linearIntExpr(0);
 
             rangeToRHS.put(backupDCBalance[i], ctrRHS);
@@ -211,10 +206,10 @@ public class MasterLinkedSubproblem extends ScenarioProblem implements Callable<
         backupWIPBalanceC = new IloRange[WEEKS_PER_YEAR];
         backupFGBalanceC = new IloRange[WEEKS_PER_YEAR];
 
-        WIPBalanceC[0] = sub.addEq(sub.sum(plantProd[0], sub.negative(wip[0])), 0, "WIPStockBalance" + 0);
+        WIPBalanceC[0] = sub.addEq(sub.diff(plantProd[0], wip[0]), 0, "WIPStockBalance" + 0);
         rangeToRHS.put(WIPBalanceC[0], master.linearIntExpr(0));
 
-        FGBalanceC[0] = sub.addEq(sub.sum(fgToDC[0], sub.negative(fgStock[0]), sub.negative(dcTransfer[0])), 0, "FGStockBalance" + 0);
+        FGBalanceC[0] = sub.addEq(sub.diff(fgToDC[0], sub.sum(fgStock[0], dcTransfer[0])), 0, "FGStockBalance" + 0);
         rangeToRHS.put(FGBalanceC[0], master.linearIntExpr(0));
 
         // WIP Stock Policy
@@ -228,7 +223,7 @@ public class MasterLinkedSubproblem extends ScenarioProblem implements Callable<
 
         for (int i = 1; i < Data.WEEKS_PER_YEAR; i++) {
             // WIP Stock balance
-            WIPBalanceC[i] = sub.addEq(sub.sum(plantProd[i], sub.negative(wip[i])), 0, "WIPStockBalance" + i);
+            WIPBalanceC[i] = sub.addEq(sub.diff(plantProd[i], wip[i]), 0, "WIPStockBalance" + i);
             rangeToRHS.put(WIPBalanceC[i], master.linearIntExpr(0));
 
             // FG Stock balance
@@ -239,18 +234,16 @@ public class MasterLinkedSubproblem extends ScenarioProblem implements Callable<
 
             // WIP BackUp balance
             backupWIPBalanceC[i] =
-                    sub.addEq(sub.sum(backupWIPStock[i - 1], sub.negative(backupWIPTransfer[i]), sub.negative(backupWIPStock[i])), 0,
-                            "WIPBackupBalance" + i);
+                    sub.addEq(sub.diff(backupWIPStock[i - 1], sub.sum(backupWIPTransfer[i], backupWIPStock[i])), 0, "WIPBackupBalance" + i);
             rangeToRHS.put(backupWIPBalanceC[i], master.linearIntExpr(0));
-
 
             // FG Backup balance
             backupFGBalanceC[i] =
-                    sub.addEq(sub.sum(backupFGStock[i - 1], sub.negative(backupFGTransfer[i]), sub.negative(backupFGStock[i])), 0,
-                            "FGBackupBalance" + i);
+                    sub.addEq(sub.diff(backupFGStock[i - 1], sub.sum(backupFGTransfer[i], backupFGStock[i])), 0, "FGBackupBalance" + i);
             rangeToRHS.put(backupFGBalanceC[i], master.linearIntExpr(0));
 
         }
+
     }
 
     @Override
@@ -290,18 +283,18 @@ public class MasterLinkedSubproblem extends ScenarioProblem implements Callable<
 
         // Backup supplier policy
         updateOptionRHS(backupSupplierBalance, policyData.backupSupplierCapacity, policyData.backupSupplierDelayedCapacity,
-                scenario.getSupplierDisruptionStart());
+                scenario.getSupplierDisruptionStart(), scenario.getSupplierDisruptionEnd());
 
         // Backup Plant Policy Update
         updateOptionRHS(backupPlantBalance, policyData.backupPlantCapacity, policyData.backupPlantDelayedCapacity,
-                scenario.getPlantDisruptionStart());
+                scenario.getPlantDisruptionStart(), scenario.getPlantDisruptionEnd());
 
         // Backup DC Policy Update
         updateOptionRHS(backupDCBalance, policyData.backupDCCapacity, policyData.backupDCDelayedCapacity,
-                scenario.getDcDisruptionStart());
+                scenario.getDcDisruptionStart(), scenario.getDcDisruptionEnd());
     }
 
-    private void updateOptionRHS(IloRange[] backupConstraints, double rhsValue, double[] delays, int disruptionStart)
+    private void updateOptionRHS(IloRange[] backupConstraints, double rhsValue, double[] delays, int disruptionStart, int disruptionEnd)
             throws IloException {
 
         assert rhsValue > -1e-6 : "No puede haber RHS negativos";
@@ -311,7 +304,9 @@ public class MasterLinkedSubproblem extends ScenarioProblem implements Callable<
             // in which case cplex throws an error
             if (!rangeToRHS.get(backupConstraints[i]).equals(master.linearIntExpr(0))) {
                 double adjusted =
-                        (i >= disruptionStart && i < disruptionStart + Data.MAX_DELAY) ? rhsValue - delays[i - disruptionStart] : rhsValue;
+                        i >= disruptionStart && i < disruptionEnd ?
+                                (i >= disruptionStart && i < disruptionStart + Data.MAX_DELAY) ? rhsValue - delays[i - disruptionStart]
+                                        : rhsValue : 0;
                 backupConstraints[i].setUB(Math.max(0.0, adjusted));
             }
 

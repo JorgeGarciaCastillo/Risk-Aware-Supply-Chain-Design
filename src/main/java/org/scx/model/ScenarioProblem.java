@@ -250,8 +250,8 @@ public class ScenarioProblem implements Callable<IloCplex.Status> {
             sub.addLe(fgStock[i], Data.BASE_DC_STOCK_LEVEL, "initialFgSafety");
         }
 
-        sub.addEq(sub.sum(plantProd[0], sub.negative(wip[0])), 0, "WIPStockBalance" + 0);
-        sub.addEq(sub.sum(fgToDC[0], sub.negative(fgStock[0]), sub.negative(dcTransfer[0])), 0, "FGStockBalance" + 0);
+        sub.addEq(sub.diff(plantProd[0], wip[0]), 0, "WIPStockBalance" + 0);
+        sub.addEq(sub.diff(fgToDC[0], sub.sum(fgStock[0], dcTransfer[0])), 0, "FGStockBalance" + 0);
 
         // WIP Stock Policy
         sub.addEq(backupWIPStock[0], 0.0, "initialWIPStock");
@@ -262,7 +262,7 @@ public class ScenarioProblem implements Callable<IloCplex.Status> {
 
         for (int i = 1; i < Data.WEEKS_PER_YEAR; i++) {
             // WIP Stock balance
-            sub.addEq(sub.sum(plantProd[i], sub.negative(wip[i])), 0, "WIPStockBalance" + i);
+            sub.addEq(sub.diff(plantProd[i], wip[i]), 0, "WIPStockBalance" + i);
 
             // FG Stock balance
             sub.addEq(sub.sum(fgToDC[i], fgStock[i - 1], sub.negative(fgStock[i]), sub.negative(dcTransfer[i])), 0,

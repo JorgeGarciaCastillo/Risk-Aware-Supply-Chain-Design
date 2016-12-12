@@ -70,11 +70,10 @@ public class SampledAverageApproximation {
         for (int i = 0; i < m; i++) {
             List<RandomScenario> scenarios = sampler.generate(5, n / 5);
             MulticutLShaped master = new MulticutLShaped(scenarios, riskMeasure);
-            LOG.debug(">>>> MASTER {} SCENARIOS : {}", i, scenarios);
+            LOG.trace(">>>> MASTER {} SCENARIOS : {}", i, scenarios);
             master.solve();
             Solution solution = master.getSolution();
             solutions.add(solution);
-
             // Free native memory in each inner iteration to avoir Out Of Memory
             master.end();
 
@@ -115,7 +114,7 @@ public class SampledAverageApproximation {
 
             Solution subproblemSol = subproblem.recordSolution();
             subproblemSol.totalCost += solution.facBackupCost;
-            LOG.trace("{};{};{};{}", subproblemSol.totalCost, subproblemSol.avgLostSales, subproblemSol.invCarryCost, sample);
+            LOG.debug("{};{};{};{}", subproblemSol.totalCost, subproblemSol.avgLostSales, subproblemSol.invCarryCost, sample);
 
             saaSolutions.add(subproblemSol);
 

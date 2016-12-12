@@ -1,5 +1,7 @@
 package org.scx;
 
+import static java.lang.String.format;
+
 import java.util.Objects;
 
 
@@ -145,5 +147,38 @@ public class Solution {
     public String toString() {
         return "Solution [totalCost=" + totalCost + ", avgLostSales=" + avgLostSales + ", facBackupCost=" + facBackupCost
                 + ", invCarryCost=" + invCarryCost + ", backupPolicy=" + backupPolicy + "]";
+    }
+
+    /**
+     * Display solution
+     * 
+     * @param s
+     */
+    public static void display(Solution s) {
+        System.out.println("***\nThe unified model's solution has total cost "
+                + String.format("%10.5f", s.totalCost)
+                + ".\nInventory Cost: " + s.invCarryCost
+                + ".\nBackup Cost: " + s.facBackupCost
+                + ".\nLost Sales Cost: " + s.avgLostSales);
+        System.out
+                .println("WEEK  SupplierProd backupSupplier  backupWIPTransfer  wip  plantProd  backupPlant  fgToDC  fgStock  dcTransfer  backupFGTransfer  backupDC  fgToCustomer  LostSales");
+        for (int i = 0; i < Data.WEEKS_PER_YEAR; i++) {
+            System.out.print(i);
+            System.out.print(" \t" + format("%.2f", s.supplierProd[i]));
+            System.out.print(" \t" + format("%.2f", s.backupSupplier[i]));
+            System.out.print(" \t" + format("%.2f", s.backupWIPTransfer[i]));
+            System.out.print(" \t" + format("%.2f", s.wip[i]));
+            System.out.print(" \t" + format("%.2f", s.plantProd[i]));
+            System.out.print(" \t" + format("%.2f", s.backupPlant[i]));
+            System.out.print(" \t" + format("%.2f", s.fgToDC[i]));
+            System.out.print(" \t" + format("%.2f", s.fgStock[i]));
+            System.out.print(" \t" + format("%.2f", s.dcTransfer[i]));
+            System.out.print(" \t" + format("%.2f", s.backupFGTransfer[i]));
+            System.out.print(" \t" + format("%.2f", s.backupDC[i]));
+            System.out.print(" \t" + format("%.2f", s.fgToCustomer[i]));
+            System.out.print(" \t" + format("%.2f", s.lostSales[i]));
+            System.out.println();
+        }
+        System.out.println("BackUpPolicy : " + s.backupPolicy);
     }
 }
