@@ -105,7 +105,7 @@ public class SampledAverageApproximation {
     private SolutionCostBound sampleCostForSolution(int n2, Solution solution) throws IloException {
         List<Solution> saaSolutions = new ArrayList<>();
         LOG.info("{}", solution);
-        for (RandomScenario sample : sampler.generate(10, n2 / 10)) {
+        for (RandomScenario sample : sampler.generate(1, n2)) {
             // Create and Solve subproblem for scenario
             ScenarioProblem subproblem = new ScenarioProblem(solution.policyData, sample);
             IloCplex.Status status = subproblem.solve();

@@ -590,9 +590,11 @@ public class MulticutLShaped {
      * Exports models to file to work with them
      */
     private void exportModels() throws IloException {
-        master.exportModel("ScreamBenders.lp");
-        //        master.exportModel("ScreamBenders.sav");
-        //        master.writeParam("ScreamBenders.prm");
+        if (LOG.isDebugEnabled()) {
+            master.exportModel("ScreamBenders.lp");
+            master.exportModel("ScreamBenders.sav");
+            master.writeParam("ScreamBenders.prm");
+        }
     }
 
     /**

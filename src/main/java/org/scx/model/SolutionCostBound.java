@@ -2,6 +2,8 @@ package org.scx.model;
 
 import java.util.List;
 
+import org.apache.commons.math3.distribution.NormalDistribution;
+import org.apache.commons.math3.distribution.RealDistribution;
 import org.apache.commons.math3.distribution.TDistribution;
 
 /**
@@ -13,6 +15,8 @@ import org.apache.commons.math3.distribution.TDistribution;
  * the mean to contain a given proportion of the area
  */
 public class SolutionCostBound {
+
+    private static final int LOW_NB_OF_SAMPLES = 30;
 
     private final double sampledAverage;
     private final double sampledVariance;
@@ -30,16 +34,19 @@ public class SolutionCostBound {
     public SolutionCostBound(double confidence, List<Double> sampledCosts) {
         this.sampledAverage = computeAverage(sampledCosts);
         this.sampledVariance = computeSampleVariance(sampledCosts);
-
-        // Create T Distribution with N-1 degrees of freedom
-        TDistribution tDist = new TDistribution(Math.max(1, sampledCosts.size() - 1));
         // Calculate critical value
-        double critVal = tDist.inverseCumulativeProbability(1.0 - (1 - confidence) / 2);
+        double critVal = computeCriticalValue(confidence, sampledCosts.size());
 
         double margin = critVal * Math.sqrt(sampledVariance / sampledCosts.size());
         this.confidenceIntervalLB = sampledAverage - margin;
         this.confidenceIntervalUB = sampledAverage + margin;
     }
+
+    private double computeCriticalValue(double confidence, int size) {
+        RealDistribution dist = size > 1 && size < LOW_NB_OF_SAMPLES ? new TDistribution(Math.max(1, size - 1)) : new NormalDistribution();
+        return dist.inverseCumulativeProbability(1.0 - (1 - confidence) / 2);
+    }
+
 
     private double computeAverage(List<Double> solutions) {
         return solutions

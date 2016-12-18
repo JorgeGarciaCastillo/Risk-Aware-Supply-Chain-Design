@@ -12,6 +12,8 @@ import org.scx.model.SingleModel;
 import org.scx.sample.LatinHypercubeSampler;
 import org.scx.sample.RandomScenario;
 import org.scx.sample.SingleScenarioSampler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import ilog.concert.IloException;
 
@@ -19,6 +21,8 @@ import ilog.concert.IloException;
  * Main class to solve a very close approximation of the Scream game
  */
 public class Scream {
+
+    private static final Logger LOG = LoggerFactory.getLogger(Scream.class);
 
     /**
      * Solving algorithms
@@ -71,9 +75,9 @@ public class Scream {
             Solution s = saa.getSolution();
             long end = System.currentTimeMillis();
             display(s);
-            System.out.println("*** Elapsed time = " + (end - start) + " ms. ***");
+            LOG.info("*** Elapsed time = {} ms. ***", (end - start));
         } catch (IloException ex) {
-            System.err.println("\n!!!Unable to solve the Sampled Average Approximation model:\n" + ex.getMessage() + "!!!");
+            LOG.error("\n!!!Unable to solve the Sampled Average Approximation model:\n" + ex.getMessage() + "!!!");
         }
     }
 
@@ -93,9 +97,9 @@ public class Scream {
             long end = System.currentTimeMillis();
             display(s);
             model.end();
-            System.out.println("*** Elapsed time = " + (end - start) + " ms. ***");
+            LOG.info("*** Elapsed time = {} ms. ***", (end - start));
         } catch (IloException ex) {
-            System.err.println("\n!!!Unable to solve the Benders model:\n" + ex.getMessage() + "!!!");
+            LOG.error("\n!!!Unable to solve the Benders model:\n{}!!!", ex.getMessage());
         }
     }
 
@@ -112,9 +116,9 @@ public class Scream {
             Solution s = model.solve();
             long end = System.currentTimeMillis();
             display(s);
-            System.out.println("*** Elapsed time = " + (end - start) + " ms. ***");
+            LOG.info("*** Elapsed time = {} ms. ***", (end - start));
         } catch (IloException ex) {
-            System.err.println("\nUnable to solve the unified model:\n" + ex.getMessage());
+            LOG.error("\nUnable to solve the unified model:\n" + ex.getMessage());
         }
     }
 
