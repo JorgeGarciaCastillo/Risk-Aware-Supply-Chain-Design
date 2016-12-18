@@ -1,23 +1,23 @@
-package org.scx.model;
+package org.scd.model;
 
-import static org.scx.Data.BASE_DC_STOCK_LEVEL;
-import static org.scx.Data.DESIRED_IFR;
-import static org.scx.Data.FG_COST;
-import static org.scx.Data.FG_PRICE;
-import static org.scx.Data.IRR;
-import static org.scx.Data.MAX_DELAY;
-import static org.scx.Data.PLANT_CAPACITY;
-import static org.scx.Data.SUPPLIER_CAPACITY;
-import static org.scx.Data.WEEKS_PER_YEAR;
-import static org.scx.Data.WIP_COST;
+import static org.scd.Data.BASE_DC_STOCK_LEVEL;
+import static org.scd.Data.DESIRED_IFR;
+import static org.scd.Data.FG_COST;
+import static org.scd.Data.FG_PRICE;
+import static org.scd.Data.IRR;
+import static org.scd.Data.MAX_DELAY;
+import static org.scd.Data.PLANT_CAPACITY;
+import static org.scd.Data.SUPPLIER_CAPACITY;
+import static org.scd.Data.WEEKS_PER_YEAR;
+import static org.scd.Data.WIP_COST;
 
 import java.util.Arrays;
 import java.util.concurrent.Callable;
 
-import org.scx.Data;
-import org.scx.Solution;
-import org.scx.Solution.BackupPoliciyData;
-import org.scx.sample.RandomScenario;
+import org.scd.Data;
+import org.scd.Solution;
+import org.scd.Solution.BackupPoliciyData;
+import org.scd.sample.RandomScenario;
 
 import ilog.concert.IloException;
 import ilog.concert.IloNumExpr;

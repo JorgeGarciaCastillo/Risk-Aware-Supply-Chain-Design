@@ -21,7 +21,7 @@
         </encoder>
     </appender>
     
-    <logger name="org.scx" level="INFO" />
+    <logger name="org.scd" level="INFO" />
 
     <root level="INFO">
         <appender-ref ref="FILE" />

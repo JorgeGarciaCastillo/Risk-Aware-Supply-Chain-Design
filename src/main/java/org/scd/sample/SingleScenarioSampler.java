@@ -1,4 +1,4 @@
-package org.scx.sample;
+package org.scd.sample;
 
 import java.util.Collections;
 import java.util.List;

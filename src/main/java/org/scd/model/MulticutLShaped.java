@@ -1,20 +1,20 @@
-package org.scx.model;
+package org.scd.model;
 
 import static java.lang.Double.MAX_VALUE;
-import static org.scx.Data.DC_OPTIONS;
-import static org.scx.Data.FOUR_WEEKS_DELAY_OPTION;
-import static org.scx.Data.MAX_DELAY;
-import static org.scx.Data.MEAN_DEMAND;
-import static org.scx.Data.NO_DELAY_OPTION;
-import static org.scx.Data.NUM_BACKUP_POLICIES;
-import static org.scx.Data.ONE_WEEK_DELAY_OPTION;
-import static org.scx.Data.PLANT_CAPACITY;
-import static org.scx.Data.PLANT_OPTIONS;
-import static org.scx.Data.SIX_WEEKS_DELAY_OPTION;
-import static org.scx.Data.SUPPLIER_CAPACITY;
-import static org.scx.Data.SUPPLIER_OPTIONS;
-import static org.scx.Data.TWO_WEEK_DELAY_OPTION;
-import static org.scx.Scream.RiskMeasure.probFinancialRisk;
+import static org.scd.Data.DC_OPTIONS;
+import static org.scd.Data.FOUR_WEEKS_DELAY_OPTION;
+import static org.scd.Data.MAX_DELAY;
+import static org.scd.Data.MEAN_DEMAND;
+import static org.scd.Data.NO_DELAY_OPTION;
+import static org.scd.Data.NUM_BACKUP_POLICIES;
+import static org.scd.Data.ONE_WEEK_DELAY_OPTION;
+import static org.scd.Data.PLANT_CAPACITY;
+import static org.scd.Data.PLANT_OPTIONS;
+import static org.scd.Data.SIX_WEEKS_DELAY_OPTION;
+import static org.scd.Data.SUPPLIER_CAPACITY;
+import static org.scd.Data.SUPPLIER_OPTIONS;
+import static org.scd.Data.TWO_WEEK_DELAY_OPTION;
+import static org.scd.Designer.RiskMeasure.probFinancialRisk;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,13 +25,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.scx.Data;
-import org.scx.Data.BackupOption;
-import org.scx.Scream.RiskMeasure;
-import org.scx.Solution;
-import org.scx.Solution.BackupPoliciyData;
-import org.scx.Solution.BackupPolicy;
-import org.scx.sample.RandomScenario;
+import org.scd.Data;
+import org.scd.Solution;
+import org.scd.Data.BackupOption;
+import org.scd.Designer.RiskMeasure;
+import org.scd.Solution.BackupPoliciyData;
+import org.scd.Solution.BackupPolicy;
+import org.scd.sample.RandomScenario;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

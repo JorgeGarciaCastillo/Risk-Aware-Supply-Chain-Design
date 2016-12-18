@@ -1,4 +1,4 @@
-package org.scx.model;
+package org.scd.model;
 
 import java.util.ArrayList;
 import java.util.Collection;

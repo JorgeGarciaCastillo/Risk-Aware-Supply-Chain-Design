@@ -1,4 +1,4 @@
-package org.scx.viewer;
+package org.scd.viewer;
 
 
 import java.util.Random;
@@ -7,12 +7,12 @@ import org.graphstream.graph.Edge;
 import org.graphstream.graph.Graph;
 import org.graphstream.graph.Node;
 import org.graphstream.graph.implementations.MultiGraph;
-import org.scx.Data;
-import org.scx.Solution;
-import org.scx.model.SingleModel;
-import org.scx.sample.MonteCarloSampler;
-import org.scx.sample.RandomScenario;
-import org.scx.sample.SingleScenarioSampler;
+import org.scd.Data;
+import org.scd.Solution;
+import org.scd.model.SingleModel;
+import org.scd.sample.MonteCarloSampler;
+import org.scd.sample.RandomScenario;
+import org.scd.sample.SingleScenarioSampler;
 
 /**
  * Graphic viewer of SCREAM solution

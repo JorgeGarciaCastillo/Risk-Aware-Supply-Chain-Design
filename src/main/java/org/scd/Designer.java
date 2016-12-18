@@ -1,28 +1,28 @@
-package org.scx;
+package org.scd;
 
-import static org.scx.Solution.display;
+import static org.scd.Solution.display;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
-import org.scx.model.MulticutLShaped;
-import org.scx.model.SampledAverageApproximation;
-import org.scx.model.SingleModel;
-import org.scx.sample.LatinHypercubeSampler;
-import org.scx.sample.RandomScenario;
-import org.scx.sample.SingleScenarioSampler;
+import org.scd.model.MulticutLShaped;
+import org.scd.model.SampledAverageApproximation;
+import org.scd.model.SingleModel;
+import org.scd.sample.LatinHypercubeSampler;
+import org.scd.sample.RandomScenario;
+import org.scd.sample.SingleScenarioSampler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import ilog.concert.IloException;
 
 /**
- * Main class to solve a very close approximation of the Scream game
+ * Main class to solve stochastic design model
  */
-public class Scream {
+public class Designer {
 
-    private static final Logger LOG = LoggerFactory.getLogger(Scream.class);
+    private static final Logger LOG = LoggerFactory.getLogger(Designer.class);
 
     /**
      * Solving algorithms

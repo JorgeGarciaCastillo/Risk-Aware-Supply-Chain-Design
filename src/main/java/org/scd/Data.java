@@ -1,4 +1,4 @@
-package org.scx;
+package org.scd;
 
 /**
  * Data from the SCREAM Game and aditional Risk measure date

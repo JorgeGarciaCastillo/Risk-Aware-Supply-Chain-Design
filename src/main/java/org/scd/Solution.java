@@ -1,4 +1,4 @@
-package org.scx;
+package org.scd;
 
 import static java.lang.String.format;
 

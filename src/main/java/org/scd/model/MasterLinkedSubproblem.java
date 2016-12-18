@@ -1,20 +1,20 @@
-package org.scx.model;
+package org.scd.model;
 
-import static org.scx.Data.BASE_DC_STOCK_LEVEL;
-import static org.scx.Data.DESIRED_IFR;
-import static org.scx.Data.MAX_DELAY;
-import static org.scx.Data.PLANT_CAPACITY;
-import static org.scx.Data.SUPPLIER_CAPACITY;
-import static org.scx.Data.WEEKS_PER_YEAR;
+import static org.scd.Data.BASE_DC_STOCK_LEVEL;
+import static org.scd.Data.DESIRED_IFR;
+import static org.scd.Data.MAX_DELAY;
+import static org.scd.Data.PLANT_CAPACITY;
+import static org.scd.Data.SUPPLIER_CAPACITY;
+import static org.scd.Data.WEEKS_PER_YEAR;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
 
-import org.scx.Data;
-import org.scx.Solution.BackupPoliciyData;
-import org.scx.sample.RandomScenario;
+import org.scd.Data;
+import org.scd.Solution.BackupPoliciyData;
+import org.scd.sample.RandomScenario;
 
 import ilog.concert.IloConstraint;
 import ilog.concert.IloException;

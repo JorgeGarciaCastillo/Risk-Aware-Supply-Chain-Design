@@ -1,4 +1,4 @@
-package org.scx.model;
+package org.scd.model;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -6,10 +6,10 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
-import org.scx.Scream.RiskMeasure;
-import org.scx.Solution;
-import org.scx.sample.RandomScenario;
-import org.scx.sample.ScenarioSampler;
+import org.scd.Solution;
+import org.scd.Designer.RiskMeasure;
+import org.scd.sample.RandomScenario;
+import org.scd.sample.ScenarioSampler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

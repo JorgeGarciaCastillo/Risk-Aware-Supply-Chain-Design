@@ -1,7 +1,7 @@
-package org.scx.sample;
+package org.scd.sample;
 
-import static org.scx.Data.NB_FACILITIES;
-import static org.scx.Data.WEEKS_PER_YEAR;
+import static org.scd.Data.NB_FACILITIES;
+import static org.scd.Data.WEEKS_PER_YEAR;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,7 +14,7 @@ import org.apache.commons.math3.distribution.UniformIntegerDistribution;
 import org.apache.commons.math3.distribution.ZipfDistribution;
 import org.apache.commons.math3.random.RandomGenerator;
 import org.apache.commons.math3.random.RandomGeneratorFactory;
-import org.scx.Data;
+import org.scd.Data;
 
 /**
  * Generates scenarios random demand and disruption using LatinHypercube sampling
