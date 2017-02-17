@@ -21,7 +21,7 @@ import org.scd.Data;
  */
 public class LatinHypercubeSampler implements ScenarioSampler {
 
-    private final RandomGenerator generator;
+    protected final RandomGenerator generator;
     private final RealDistribution demandDistribution;
     private final IntegerDistribution disruptionDistribution;
     private final IntegerDistribution disasterLengthDistribution;

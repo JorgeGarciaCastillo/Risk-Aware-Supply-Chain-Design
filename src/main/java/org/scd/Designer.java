@@ -19,6 +19,9 @@ import ilog.concert.IloException;
 
 /**
  * Main class to solve stochastic design model
+ * 
+ * TODO Use distributions where variance increases over time eg. 5% for first n months 20% + k for the following TODO Define risk measure
+ * Average Value at Risk
  */
 public class Designer {
 
